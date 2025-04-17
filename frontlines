@@ -1,0 +1,107 @@
+local workspace = getchildren(Game)[1]
+local espElements = {}
+local localPlayer = getlocalplayer()
+local localPlayerChar = getcharacter(localPlayer)
+local localHumanoidRootPart = findfirstchild(localPlayerChar, "HumanoidRootPart")
+
+
+local function getModelName(model)
+    return getname(model)
+end
+
+
+local function isFriendly(model)
+    local friendlyMarker = findfirstchild(model, "friendly_marker")
+    return friendlyMarker ~= nil
+end
+
+
+local function getPosition(part)
+    return part and string.find(getclassname(part), "Part") and getposition(part) or nil
+end
+
+
+local function ESP()
+    local esp = {
+        text = Drawing.new("Text"),
+        distanceText = Drawing.new("Text"),
+    }
+    for _, t in pairs({esp.text, esp.distanceText}) do
+        t.Size = 12
+        t.Center = true
+        t.Outline = true
+    end
+    esp.text.Color = {255, 0, 0} -- Vermelho para inimigos
+    esp.distanceText.Color = {255, 255, 255}
+    return esp
+end
+
+
+local function updateESP(part, esp, modelName)
+    local pos3D = getPosition(part)
+    if pos3D then
+        local pos2D, onScreen = worldtoscreenpoint({pos3D.x, pos3D.y, pos3D.z})
+        if onScreen then
+            local localPos3D = getPosition(localHumanoidRootPart)
+            if localPos3D then
+                local distance = math.round(math.sqrt(
+                    (pos3D.x - localPos3D.x)^2 +
+                    (pos3D.y - localPos3D.y)^2 +
+                    (pos3D.z - localPos3D.z)^2
+                ))
+
+                esp.text.Position = {pos2D.x, pos2D.y - 15}
+                esp.text.Text = modelName
+                esp.text.Visible = true
+
+                esp.distanceText.Position = {pos2D.x, pos2D.y + 15}
+                esp.distanceText.Text = string.format("D: %d", distance)
+                esp.distanceText.Visible = true
+            end
+        else
+            esp.text.Visible = false
+            esp.distanceText.Visible = false
+        end
+    else
+        esp.text.Visible = false
+        esp.distanceText.Visible = false
+    end
+end
+
+
+spawn(function()
+    while true do
+        local currentParts = {}
+        local localPos3D = getPosition(localHumanoidRootPart)
+        if localPos3D then
+            for _, model in pairs(getchildren(workspace)) do
+                if getclassname(model) == "Model" then
+                    local modelName = getModelName(model)
+
+                    
+                    if modelName == "soldier_model" and not isFriendly(model) then
+                        local mainPart = findfirstchild(model, "HumanoidRootPart") 
+                        if mainPart then
+                            currentParts[model] = true
+                            if not espElements[model] then
+                                espElements[model] = ESP()
+                            end
+                            
+                            updateESP(mainPart, espElements[model], modelName)
+                        end
+                    end
+                end
+            end
+
+            
+            for model in pairs(espElements) do
+                if not currentParts[model] then
+                    espElements[model].text:Remove()
+                    espElements[model].distanceText:Remove()
+                    espElements[model] = nil
+                end
+            end
+        end
+        wait(0.001)
+    end
+end)
