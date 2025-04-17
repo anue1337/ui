@@ -1,0 +1,87 @@
+local workspace = getchildren(Game)[1]
+local espElements = {}
+local localPlayer = getlocalplayer()
+local localPlayerChar = getcharacter(localPlayer)
+local localHumanoidRootPart = findfirstchild(localPlayerChar, "HumanoidRootPart")
+local fruitsFolder = workspace
+
+local function getPosition(part)
+    return part and string.find(getclassname(part), "Part") and getposition(part) or nil
+end
+
+local function ESP()
+    local esp = {
+        text = Drawing.new("Text"),
+        distanceText = Drawing.new("Text"),
+    }
+    for _, t in pairs({esp.text, esp.distanceText}) do
+        t.Size = 12
+        t.Center = true
+        t.Outline = true
+    end
+    esp.text.Color = {255, 255, 255}
+    esp.distanceText.Color = {255, 255, 255}
+    return esp
+end
+
+local function updateESP(part, esp, fruitName)
+    local pos3D = getPosition(part)
+    if pos3D then
+        local pos2D, onScreen = worldtoscreenpoint({pos3D.x, pos3D.y, pos3D.z})
+        if onScreen then
+            local localPos3D = getPosition(localHumanoidRootPart)
+            if localPos3D then
+                local distance = math.round(math.sqrt(
+                    (pos3D.x - localPos3D.x)^2 +
+                    (pos3D.y - localPos3D.y)^2 +
+                    (pos3D.z - localPos3D.z)^2
+                ))
+
+                esp.text.Position = {pos2D.x, pos2D.y - 15}
+                esp.text.Text = fruitName
+                esp.text.Visible = true
+
+                esp.distanceText.Position = {pos2D.x, pos2D.y + 15}
+                esp.distanceText.Text = string.format("D: %d", distance)
+                esp.distanceText.Visible = true
+            end
+        else
+            esp.text.Visible = false
+            esp.distanceText.Visible = false
+        end
+    else
+        esp.text.Visible = false
+        esp.distanceText.Visible = false
+    end
+end
+
+spawn(function()
+    while true do
+        local currentParts = {}
+        local localPos3D = getPosition(localHumanoidRootPart)
+        if localPos3D then
+            for _, fruit in pairs(getchildren(fruitsFolder)) do
+                if getclassname(fruit) == "Tool" then
+                    local handle = findfirstchild(fruit, "Handle")
+                    if handle then
+                        local fruitName = getname(fruit)
+                        currentParts[fruit] = true
+                        if not espElements[fruit] then
+                            espElements[fruit] = ESP()
+                        end
+                        updateESP(handle, espElements[fruit], fruitName)
+                    end
+                end
+            end
+
+            for fruit in pairs(espElements) do
+                if not currentParts[fruit] then
+                    espElements[fruit].text:Remove()
+                    espElements[fruit].distanceText:Remove()
+                    espElements[fruit] = nil
+                end
+            end
+        end
+        wait(0.001)
+    end
+end)
