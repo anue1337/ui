@@ -1,0 +1,114 @@
+local workspace = getchildren(Game)[1]
+local espElements = {}
+local localPlayer = getlocalplayer()
+local localPlayerChar = getcharacter(localPlayer)
+local localHumanoidRootPart = findfirstchild(localPlayerChar, "HumanoidRootPart")
+
+local function getPosition(part)
+    return part and string.find(getclassname(part), "Part") and getposition(part) or nil
+end
+
+local function ESP(color, textSize)
+    local esp = {
+        text = Drawing.new("Text"),
+        distanceText = Drawing.new("Text"),
+    }
+    for _, t in pairs({esp.text, esp.distanceText}) do
+        t.Size = textSize
+        t.Center = true
+        t.Outline = true
+    end
+    esp.text.Color = color
+    esp.distanceText.Color = color
+    return esp
+end
+
+local function updateESP(part, esp, entityName)
+    local pos3D = getPosition(part)
+    if pos3D then
+        local pos2D, onScreen = worldtoscreenpoint({pos3D.x, pos3D.y, pos3D.z})
+        if onScreen then
+            local localPos3D = getPosition(localHumanoidRootPart)
+            if localPos3D then
+                local distance = math.round(math.sqrt(
+                    (pos3D.x - localPos3D.x)^2 +
+                    (pos3D.y - localPos3D.y)^2 +
+                    (pos3D.z - localPos3D.z)^2
+                ))
+
+                esp.text.Position = {pos2D.x, pos2D.y - 15}
+                esp.text.Text = entityName
+                esp.text.Visible = true
+
+                esp.distanceText.Position = {pos2D.x, pos2D.y + 15}
+                esp.distanceText.Text = string.format("D: %d", distance)
+                esp.distanceText.Visible = true
+            end
+        else
+            esp.text.Visible = false
+            esp.distanceText.Visible = false
+        end
+    else
+        esp.text.Visible = false
+        esp.distanceText.Visible = false
+    end
+end
+
+spawn(function()
+    while true do
+        local currentParts = {}
+        local localPos3D = getPosition(localHumanoidRootPart)
+        if localPos3D then
+            
+            local modelsToCheck = {
+                "Facility_0 by MrWindy",
+                "Abandoned Prison by AtomixKing & Duck_Ify",
+                "Homestead by MrWindy",
+                "Airport by deadlybones28",
+                "The Library by drainhp & CodedAbyss",
+                "Forgotten Facility by Kmart_Corp",
+                "Haunted Mansion by BreifAwesomeDude",
+                "Nuclear Power Plant by SonicUnkn0wn & Posyonose",
+                "School by Shortfingers",
+                "Abandoned Facility Optimus by SonicUnkn0wn & Kmart_Corp & VeryCoolSeal",
+                "Laboratory Complex by BlooIsHere",
+                "Sewer Treatment Plant by Jackz0_o",
+                "Arcade by D4niel_Foxy",
+            }
+
+            for _, modelName in ipairs(modelsToCheck) do
+                
+                local facilityModel = findfirstchild(workspace, modelName)
+                if facilityModel then
+                    
+                    for _, computerTableModel in pairs(getchildren(facilityModel)) do
+                        if getclassname(computerTableModel) == "Model" and getname(computerTableModel) == "ComputerTable" then
+                            
+                            local renderedPart = false
+                            for _, part in pairs(getchildren(computerTableModel)) do
+                                if getclassname(part) == "Part" and not renderedPart then
+                                    currentParts[computerTableModel] = true
+                                    if not espElements[computerTableModel] then
+                                        espElements[computerTableModel] = ESP({255, 215, 0}, 12) 
+                                    end
+                                    updateESP(part, espElements[computerTableModel], getname(computerTableModel))
+                                    renderedPart = true 
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+
+            
+            for entityModel in pairs(espElements) do
+                if not currentParts[entityModel] then
+                    espElements[entityModel].text:Remove()
+                    espElements[entityModel].distanceText:Remove()
+                    espElements[entityModel] = nil
+                end
+            end
+        end
+        wait(0.001)
+    end
+end)
