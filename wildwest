@@ -1,0 +1,241 @@
+local workspace = getchildren(Game)[1]
+local espElements = {}
+local localPlayer = getlocalplayer()
+local localPlayerChar = getcharacter(localPlayer)
+local localHumanoidRootPart = findfirstchild(localPlayerChar, "HumanoidRootPart")
+
+local screenWidth = 1920
+local screenHeight = 1080
+
+
+local currentMode = 0 
+local modeText = Drawing.new("Text")
+local guideText = Drawing.new("Text")
+
+
+local function getPosition(part)
+    return part and string.find(getclassname(part), "Part") and getposition(part) or nil
+end
+
+
+local function calculateDistance(pos1, pos2)
+    local dx = pos1.x - pos2.x
+    local dy = pos1.y - pos2.y
+    local dz = pos1.z - pos2.z
+    return math.sqrt(dx * dx + dy * dy + dz * dz)
+end
+
+
+local function createESP()
+    local esp = {
+        text = Drawing.new("Text"),
+        healthText = Drawing.new("Text"),
+        distanceText = Drawing.new("Text"),
+        roleText = Drawing.new("Text") 
+    }
+    for _, t in pairs({esp.text, esp.healthText, esp.distanceText, esp.roleText}) do
+        t.Size = 12
+        t.Center = true
+        t.Outline = true
+    end
+    esp.text.Color = {255, 255, 255}
+    esp.healthText.Color = {0, 255, 0}
+    esp.distanceText.Color = {255, 255, 255}
+    esp.roleText.Color = {255, 255, 255} 
+    return esp
+end
+
+
+local function updateESP(part, esp, parentName, health, maxHealth, isAnimal, isOre)
+    local pos3D = getPosition(part)
+    if pos3D then
+        local pos2D, onScreen = worldtoscreenpoint({pos3D.x, pos3D.y, pos3D.z})
+        if onScreen then
+            local localPos3D = getPosition(localHumanoidRootPart)
+            if localPos3D then
+                local distance = calculateDistance(pos3D, localPos3D)
+
+                if distance <= 1000 then 
+                    esp.text.Position = {pos2D.x, pos2D.y - 15}
+                    esp.text.Text = parentName
+                    esp.text.Visible = currentMode == (isAnimal and 0 or 1)
+
+                    if isAnimal and currentMode == 0 then
+                        esp.healthText.Position = {pos2D.x, pos2D.y}
+                        esp.healthText.Text = string.format("HP: %d/%d", health, maxHealth)
+                        esp.healthText.Visible = true
+
+                        if health <= (maxHealth * 0.35) then
+                            esp.healthText.Color = {255, 0, 0}
+                        elseif health <= (maxHealth * 0.5) then
+                            esp.healthText.Color = {255, 255, 0}
+                        else
+                            esp.healthText.Color = {0, 255, 0}
+                        end
+                    else
+                        esp.healthText.Visible = false
+                    end
+
+                    esp.distanceText.Position = {pos2D.x, pos2D.y + 15}
+                    esp.distanceText.Text = string.format("D: %d", math.round(distance))
+                    esp.distanceText.Visible = currentMode == (isOre and 1 or 0)
+
+                    if isOre and currentMode == 1 then
+                        esp.text.Color = {255, 255, 0}  
+                        esp.distanceText.Color = {255, 255, 0}
+                    else
+                        esp.text.Color = {255, 255, 255}
+                        esp.distanceText.Color = {255, 255, 255}
+                    end
+                else
+                    esp.text.Visible = false
+                    esp.healthText.Visible = false
+                    esp.distanceText.Visible = false
+                end
+            end
+        else
+            esp.text.Visible = false
+            esp.healthText.Visible = false
+            esp.distanceText.Visible = false
+        end
+    else
+        esp.text.Visible = false
+        esp.healthText.Visible = false
+        esp.distanceText.Visible = false
+    end
+end
+
+
+local function updateEntities()
+    local currentParts = {}
+    local localPos3D = getPosition(localHumanoidRootPart)
+    if localPos3D then
+        
+        if currentMode == 0 then
+            local animals = findfirstchild(findfirstchild(workspace, "WORKSPACE_Entities"), "Animals")
+            if animals then
+                for _, animal in ipairs(getchildren(animals)) do
+                    if getclassname(animal) == "Model" then
+                        local bodyPart = findfirstchild(animal, "Body")
+                        if bodyPart then
+                            local parentName = getname(animal)
+                            local health = 100
+                            local maxHealth = 100
+                            currentParts[bodyPart] = true
+                            if not espElements[bodyPart] then
+                                espElements[bodyPart] = createESP()
+                            end
+                            updateESP(bodyPart, espElements[bodyPart], parentName, health, maxHealth, true, false)
+                        end
+                    end
+                end
+            end
+        end
+
+        
+        if currentMode == 1 then
+            local mining = findfirstchild(findfirstchild(workspace, "WORKSPACE_Interactables"), "Mining")
+            if mining then
+                local oreDeposits = findfirstchild(mining, "OreDeposits")
+                if oreDeposits then
+                    for _, oreType in ipairs({"Coal", "Copper", "Gold", "Iron", "Silver"}) do
+                        local oreFolder = findfirstchild(oreDeposits, oreType)
+                        if oreFolder then
+                            for _, oreDeposit in ipairs(getchildren(oreFolder)) do
+                                if getclassname(oreDeposit) == "Model" then
+                                    local rockBase = findfirstchild(oreDeposit, "RockBase")
+                                    local rockOre = findfirstchild(oreDeposit, "RockOre") 
+                                    if rockBase or rockOre then
+                                        local partToUse = rockBase or rockOre
+                                        currentParts[partToUse] = true
+                                        if not espElements[partToUse] then
+                                            espElements[partToUse] = createESP()
+                                        end
+                                        updateESP(partToUse, espElements[partToUse], oreType, 0, 0, false, true)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        
+        for part, _ in pairs(espElements) do
+            if not currentParts[part] then
+                espElements[part].text:Remove()
+                espElements[part].healthText:Remove()
+                espElements[part].distanceText:Remove()
+                espElements[part].roleText:Remove()
+                espElements[part] = nil
+            end
+        end
+    end
+end
+
+
+local function updateModeText(screenSize)
+    modeText.Size = 20
+    modeText.Center = true
+    modeText.Outline = true
+    modeText.Color = {255, 255, 255}
+    modeText.Position = {screenSize.x / 2, screenSize.y / 20}
+    modeText.Text = currentMode == 0 and "Mode: Animals" or "Mode: Minerals"
+    modeText.Visible = true
+
+    guideText.Size = 16
+    guideText.Center = true
+    guideText.Outline = true
+    guideText.Color = {255, 255, 255}
+    guideText.Position = {screenSize.x / 2, screenSize.y / 20 + 30}
+    guideText.Text = "Press HOME to switch"
+    guideText.Visible = true
+end
+
+
+spawn(function()
+    while true do
+        local screenSize = getscreendimensions()
+        local startTick = tick()
+
+        if exitThread == true then
+            Drawing.clear()
+            print("Stopping rendering thread")
+            break
+        end
+
+        updateEntities()
+        updateModeText(screenSize)
+        wait(0.001)
+    end
+end)
+
+
+spawn(function()
+    local lastPressedKey = "None"
+    while true do
+        local currentPressedKey = getpressedkey()
+
+        if currentPressedKey == "End" and lastPressedKey == "End" then
+            exitThread = true
+        end
+
+        if exitThread == true then
+            Drawing.clear()
+            print("Stopping keybind thread")
+            break
+        end
+
+        if currentPressedKey == "Home" and lastPressedKey ~= "Home" then
+            if currentMode == 0 then
+                currentMode = 1
+            else
+                currentMode = 0
+            end
+            updateEntities()
+        end
+        lastPressedKey = currentPressedKey
+        wait(0.01)
+    end
+end)
