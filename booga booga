@@ -1,0 +1,300 @@
+local Workspace = getchildren(Game)[1]
+local localPlayer = getlocalplayer()
+local localPlayerChar = getcharacter(localPlayer)
+local localHrp = nil
+local driftwoodFolder = findfirstchild(Workspace, "Resources")
+local smallTreeFolder = findfirstchild(Workspace, "Resources")
+local stoneNodeFolder = findfirstchild(Workspace, "Resources")
+local ironNodeFolder = findfirstchild(Workspace, "Resources")
+local goldNodeFolder = findfirstchild(Workspace, "Resources")
+local driftwoodModels = {}
+local smallTreeModels = {}
+local stoneNodeModels = {}
+local ironNodeModels = {}
+local goldNodeModels = {}
+
+local function isModel(instance)
+    return getclassname(instance) == "Model"
+end
+
+local function getPartPosition(part)
+    if part and string.find(getclassname(part), "Part") then
+        return getposition(part)
+    end
+    return nil
+end
+
+local function getLocalPlayerRootPartPosition()
+    if localPlayer and localPlayerChar then
+        local rootPart = findfirstchild(localPlayerChar, "HumanoidRootPart")
+        if rootPart then
+            return getPartPosition(rootPart)
+        end
+    end
+    return nil
+end
+
+
+local function getDistance(pos1, pos2)
+    return math.round(math.sqrt((pos1.x - pos2.x)^2 + (pos1.y - pos2.y)^2 + (pos1.z - pos2.z)^2))
+end
+
+
+local function updateDriftwoodESP()
+    if driftwoodFolder then
+        for _, obj in pairs(getchildren(driftwoodFolder)) do
+            if isModel(obj) and getname(obj) == "Driftwood" then
+                local mainPart = findfirstchild(obj, "Trunk")
+                if mainPart and not driftwoodModels[obj] then
+                    driftwoodModels[obj] = {
+                        ["Part"] = mainPart,
+                        ["Drawing"] = Drawing.new("Text"),
+                        ["Parent"] = obj
+                    }
+                    print(string.format("%s was found", getname(obj)))
+                end
+            end
+        end
+    end
+end
+
+
+local function updateSmallTreeESP()
+    if smallTreeFolder then
+        for _, obj in pairs(getchildren(smallTreeFolder)) do
+            if isModel(obj) and getname(obj) == "Small Tree" then
+                local mainPart = findfirstchild(obj, "Trunk")
+                if mainPart and not smallTreeModels[obj] then
+                    smallTreeModels[obj] = {
+                        ["Part"] = mainPart,
+                        ["Drawing"] = Drawing.new("Text"),
+                        ["Parent"] = obj
+                    }
+                    print(string.format("%s was found", getname(obj)))
+                end
+            end
+        end
+    end
+end
+
+
+local function updateStoneNodeESP()
+    if stoneNodeFolder then
+        for _, obj in pairs(getchildren(stoneNodeFolder)) do
+            if isModel(obj) and getname(obj) == "Stone Node" then
+                local mainPart = findfirstchild(obj, "Node")
+                if mainPart and not stoneNodeModels[obj] then
+                    stoneNodeModels[obj] = {
+                        ["Part"] = mainPart,
+                        ["Drawing"] = Drawing.new("Text"),
+                        ["Parent"] = obj
+                    }
+                    print(string.format("%s was found", getname(obj)))
+                end
+            end
+        end
+    end
+end
+
+
+local function updateIronNodeESP()
+    if ironNodeFolder then
+        for _, obj in pairs(getchildren(ironNodeFolder)) do
+            if isModel(obj) and getname(obj) == "Iron Node" then
+                local mainPart = findfirstchild(obj, "Node")
+                if mainPart and not ironNodeModels[obj] then
+                    ironNodeModels[obj] = {
+                        ["Part"] = mainPart,
+                        ["Drawing"] = Drawing.new("Text"),
+                        ["Parent"] = obj
+                    }
+                    print(string.format("%s was found", getname(obj)))
+                end
+            end
+        end
+    end
+end
+
+
+local function updateGoldNodeESP()
+    if goldNodeFolder then
+        for _, obj in pairs(getchildren(goldNodeFolder)) do
+            if isModel(obj) and getname(obj) == "Gold Node" then
+                local mainPart = findfirstchild(obj, "Node")
+                if mainPart and not goldNodeModels[obj] then
+                    goldNodeModels[obj] = {
+                        ["Part"] = mainPart,
+                        ["Drawing"] = Drawing.new("Text"),
+                        ["Parent"] = obj
+                    }
+                    print(string.format("%s was found", getname(obj)))
+                end
+            end
+        end
+    end
+end
+
+
+local function renderESP()
+    local localHrpPos = getLocalPlayerRootPartPosition()
+    if localHrpPos then
+
+        for i, v in pairs(driftwoodModels) do
+            if v.Part and isModel(v.Parent) then
+                local Pos3D = getPartPosition(v.Part)
+                if Pos3D then
+                    local Pos2D, OnScreen = worldtoscreenpoint({Pos3D.x, Pos3D.y, Pos3D.z})
+                    if OnScreen then
+                        local dist = getDistance(localHrpPos, Pos3D)
+                        if dist <= 300 then 
+                            v.Drawing.Visible = true
+                            v.Drawing.Position = {Pos2D.x, Pos2D.y}
+                            v.Drawing.Text = string.format("[%s] [%s]", getname(v.Parent), dist)
+                            v.Drawing.Size = 12
+                            v.Drawing.Color = {139, 69, 19}
+                            v.Drawing.Outline = true
+                            v.Drawing.OutlineColor = {0, 0, 0}
+                        else
+                            v.Drawing.Visible = false
+                        end
+                    else
+                        v.Drawing.Visible = false
+                    end
+                else
+                    v.Drawing.Visible = false
+                    driftwoodModels[i] = nil
+                end
+            end
+        end
+        
+        for i, v in pairs(smallTreeModels) do
+            if v.Part and isModel(v.Parent) then
+                local Pos3D = getPartPosition(v.Part)
+                if Pos3D then
+                    local Pos2D, OnScreen = worldtoscreenpoint({Pos3D.x, Pos3D.y, Pos3D.z})
+                    if OnScreen then
+                        local dist = getDistance(localHrpPos, Pos3D)
+                        if dist <= 300 then 
+                            v.Drawing.Visible = true
+                            v.Drawing.Position = {Pos2D.x, Pos2D.y}
+                            v.Drawing.Text = string.format("[%s] [%s]", getname(v.Parent), dist)
+                            v.Drawing.Size = 12
+                            v.Drawing.Color = {34, 139, 34}
+                            v.Drawing.Outline = true
+                            v.Drawing.OutlineColor = {0, 0, 0}
+                        else
+                            v.Drawing.Visible = false
+                        end
+                    else
+                        v.Drawing.Visible = false
+                    end
+                else
+                    v.Drawing.Visible = false
+                    smallTreeModels[i] = nil
+                end
+            end
+        end
+        
+        for i, v in pairs(stoneNodeModels) do
+            if v.Part and isModel(v.Parent) then
+                local Pos3D = getPartPosition(v.Part)
+                if Pos3D then
+                    local Pos2D, OnScreen = worldtoscreenpoint({Pos3D.x, Pos3D.y, Pos3D.z})
+                    if OnScreen then
+                        local dist = getDistance(localHrpPos, Pos3D)
+                        if dist <= 300 then 
+                            v.Drawing.Visible = true
+                            v.Drawing.Position = {Pos2D.x, Pos2D.y}
+                            v.Drawing.Text = string.format("[%s] [%s]", getname(v.Parent), dist)
+                            v.Drawing.Size = 12
+                            v.Drawing.Color = {169, 169, 169}
+                            v.Drawing.Outline = true
+                            v.Drawing.OutlineColor = {0, 0, 0}
+                        else
+                            v.Drawing.Visible = false
+                        end
+                    else
+                        v.Drawing.Visible = false
+                    end
+                else
+                    v.Drawing.Visible = false
+                    stoneNodeModels[i] = nil
+                end
+            end
+        end
+
+        for i, v in pairs(ironNodeModels) do
+            if v.Part and isModel(v.Parent) then
+                local Pos3D = getPartPosition(v.Part)
+                if Pos3D then
+                    local Pos2D, OnScreen = worldtoscreenpoint({Pos3D.x, Pos3D.y, Pos3D.z})
+                    if OnScreen then
+                        local dist = getDistance(localHrpPos, Pos3D)
+                        if dist <= 300 then 
+                            v.Drawing.Visible = true
+                            v.Drawing.Position = {Pos2D.x, Pos2D.y}
+                            v.Drawing.Text = string.format("[%s] [%s]", getname(v.Parent), dist)
+                            v.Drawing.Size = 12
+                            v.Drawing.Color = {255, 215, 0}
+                            v.Drawing.Outline = true
+                            v.Drawing.OutlineColor = {0, 0, 0}
+                        else
+                            v.Drawing.Visible = false
+                        end
+                    else
+                        v.Drawing.Visible = false
+                    end
+                else
+                    v.Drawing.Visible = false
+                    ironNodeModels[i] = nil
+                end
+            end
+        end
+
+        for i, v in pairs(goldNodeModels) do
+            if v.Part and isModel(v.Parent) then
+                local Pos3D = getPartPosition(v.Part)
+                if Pos3D then
+                    local Pos2D, OnScreen = worldtoscreenpoint({Pos3D.x, Pos3D.y, Pos3D.z})
+                    if OnScreen then
+                        local dist = getDistance(localHrpPos, Pos3D)
+                        if dist <= 300 then 
+                            v.Drawing.Visible = true
+                            v.Drawing.Position = {Pos2D.x, Pos2D.y}
+                            v.Drawing.Text = string.format("[%s] [%s]", getname(v.Parent), dist)
+                            v.Drawing.Size = 12
+                            v.Drawing.Color = {255, 223, 0}
+                            v.Drawing.Outline = true
+                            v.Drawing.OutlineColor = {0, 0, 0}
+                        else
+                            v.Drawing.Visible = false
+                        end
+                    else
+                        v.Drawing.Visible = false
+                    end
+                else
+                    v.Drawing.Visible = false
+                    goldNodeModels[i] = nil
+                end
+            end
+        end
+    end
+end
+
+while true do 
+    if getpressedkey() == "End" then
+        Drawing.clear()
+        break
+    end
+
+    updateDriftwoodESP()
+    updateSmallTreeESP()
+    updateStoneNodeESP()
+    updateIronNodeESP()
+    updateGoldNodeESP()
+    renderESP()
+    
+    wait()
+end
+
+print("Finished")
