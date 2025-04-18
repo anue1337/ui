@@ -1,0 +1,31 @@
+local Values = {}
+
+Values.Ammo = 9999999
+Values.StoredAmmo = 999999
+Values.Automatic = true
+Values.Bullets = 2 -- [[ How many bullets fire each shot, use for damage mod ]] --
+Values.EquipTime = 0
+Values.FireRate = 0.01 -- [[ Lower = faster ]] --
+Values.Range = 9999
+Values.Penetration = 999
+Values.ReloadTime = 0
+Values.Spread = 0
+
+local Weapons = findfirstchild(findfirstchild(Game, "ReplicatedStorage"), "Weapons") -- [[ findservice doesnt seem to work for replicatedstorage ]] --
+
+for _, Weapon in next, getchildren(Weapons) do
+    for _, Value in next, getchildren(Weapon) do
+        local Name = getname(Value)
+
+        if table.find(Values, Name) then
+            setvalue(Value, Values[Name])
+        end
+    end
+
+    if findfirstchild(Weapon, "Spread") then
+        for _, Value in next, getchildren(findfirstchild(Weapon, "Spread")) do
+            if getclassname(Value) == "StringValue" then continue end
+            setvalue(Value, Values.Spread)
+        end
+    end
+end
