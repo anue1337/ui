@@ -1,0 +1,132 @@
+local mods_user_ids = {1, 2, 3}
+
+-- text settings
+local text_transparency = 1    -- 0 - 1
+local text_size = 15           -- text size
+local base_offset = 7          -- offset up with every mod
+local font = 4                 -- font, 10 for better readability, 4 fits better
+
+-- ui settings
+local ui_position = "top"      -- "top", "left bottom", "right bottom"
+local ui_transparency = 1      -- 0 - 1
+
+-- code
+local SCREEN_DIMENSIONS = getscreendimensions()
+local FRAME_0 = Drawing.new("Square")
+FRAME_0.Filled = true
+FRAME_0.Visible = true
+FRAME_0.Size = {280, 140}
+
+if ui_position == "top" then
+    FRAME_0.Position = {SCREEN_DIMENSIONS.x / 2 - FRAME_0.Size.x / 2, 20}
+elseif ui_position == "left bottom" then
+    FRAME_0.Position = {20, SCREEN_DIMENSIONS.y - FRAME_0.Size.y - 20}
+elseif ui_position == "right bottom" then
+    FRAME_0.Position = {
+        SCREEN_DIMENSIONS.x - FRAME_0.Size.x - 20,
+        SCREEN_DIMENSIONS.y - FRAME_0.Size.y - 20
+    }
+else
+    FRAME_0.Position = {20, SCREEN_DIMENSIONS.y - FRAME_0.Size.y - 20}
+end
+FRAME_0.Color = {20, 20, 20}
+FRAME_0.Transparency = ui_transparency
+
+local FRAME_1 = Drawing.new("Square")
+FRAME_1.Filled = true
+FRAME_1.Visible = true
+FRAME_1.Size = {FRAME_0.Size.x - 2.5, FRAME_0.Size.y - 2.5}
+FRAME_1.Position = {FRAME_0.Position.x + 1.25, FRAME_0.Position.y + 1.25}
+FRAME_1.Color = {215, 215, 215}
+FRAME_1.Transparency = ui_transparency
+
+local FRAME_2 = Drawing.new("Square")
+FRAME_2.Filled = true
+FRAME_2.Visible = true
+FRAME_2.Size = {FRAME_1.Size.x - 3, FRAME_1.Size.y - 4}
+FRAME_2.Position = {FRAME_1.Position.x + 1.35, FRAME_1.Position.y + 2}
+FRAME_2.Color = {20, 20, 20}
+FRAME_2.Transparency = ui_transparency
+
+local FRAME_3 = Drawing.new("Square")
+FRAME_3.Filled = true
+FRAME_3.Visible = true
+FRAME_3.Size = {FRAME_2.Size.x - 3, FRAME_2.Size.y - 4}
+FRAME_3.Position = {FRAME_2.Position.x + 1.5, FRAME_2.Position.y + 2}
+FRAME_3.Color = {40, 40, 40}
+FRAME_3.Transparency = ui_transparency
+
+local TITLE_FRAME = Drawing.new("Square")
+TITLE_FRAME.Filled = true
+TITLE_FRAME.Visible = true
+TITLE_FRAME.Size = {FRAME_3.Size.x - 10, 20}
+TITLE_FRAME.Position = {FRAME_3.Position.x + 5, FRAME_3.Position.y + 5}
+TITLE_FRAME.Color = {25, 25, 25}
+TITLE_FRAME.Transparency = ui_transparency
+
+local TITLE = Drawing.new("Text")
+TITLE.Text = "universal mod checker"
+TITLE.Visible = true
+TITLE.Center = true
+TITLE.Position = {
+    TITLE_FRAME.Position.x + TITLE_FRAME.Size.x / 2,
+    TITLE_FRAME.Position.y + TITLE_FRAME.Size.y / 2 - TITLE.Size / 2
+}
+TITLE.Color = {255, 255, 255}
+TITLE.Size = 15
+TITLE.Font = 4
+TITLE.Transparency = text_transparency
+
+local TEXT_FRAME = Drawing.new("Square")
+TEXT_FRAME.Filled = true
+TEXT_FRAME.Visible = true
+TEXT_FRAME.Size = {FRAME_3.Size.x - 10, FRAME_3.Size.y - 35}
+TEXT_FRAME.Position = {
+    FRAME_3.Position.x + 5,
+    TITLE_FRAME.Position.y + TITLE_FRAME.Size.y + 5
+}
+TEXT_FRAME.Color = {25, 25, 25}
+TEXT_FRAME.Transparency = ui_transparency
+
+local TEXT_LABEL = Drawing.new("Text")
+TEXT_LABEL.Text = "0 mods detected"
+TEXT_LABEL.Visible = true
+TEXT_LABEL.Center = true
+TEXT_LABEL.Position = {
+    TEXT_FRAME.Position.x + TEXT_FRAME.Size.x / 2,
+    TEXT_FRAME.Position.y + TEXT_FRAME.Size.y / 2
+}
+TEXT_LABEL.Color = {255, 255, 255}
+TEXT_LABEL.Size = text_size
+TEXT_LABEL.Font = font
+TEXT_LABEL.Transparency = text_transparency
+
+spawn(function()
+    while true do
+        local detected_mods = {}
+        for index, player in game.Players:GetChildren() do
+            local user_id = getuserid(player.Data)
+            for index, mod_id in mods_user_ids do
+                if user_id == mod_id then
+                    if getdisplayname(player.Data) ~= player.Name then
+                        table.insert(detected_mods, getdisplayname(player.Data).." ("..player.Name..")")
+                    else
+                        table.insert(detected_mods, player.Name)
+                    end
+                end
+            end
+            wait(0)
+        end
+        if #detected_mods > 0 then
+            TEXT_LABEL.Text = #detected_mods .. " mod detected\n" .. table.concat(detected_mods, "\n")
+        else
+            TEXT_LABEL.Text = "0 mods detected"
+        end
+        local offset = base_offset * #detected_mods
+        TEXT_LABEL.Position = {
+            TEXT_FRAME.Position.x + TEXT_FRAME.Size.x / 2,
+            TEXT_FRAME.Position.y + TEXT_FRAME.Size.y / 2 - TEXT_LABEL.Size / 2 - offset
+        }
+        wait(1)
+    end
+end)
