@@ -1,0 +1,21 @@
+local player = getlocalplayer()
+local pressed = false
+
+while true do
+    local character = getcharacter(player)
+    local primarypart = getprimarypart(character)
+
+    if character and primarypart then
+        local velocity = getvelocity(primarypart)
+        local keys = getpressedkeys()
+        
+        if table.find(keys, "Space") and not pressed and velocity ~= {velocity.x, 0, velocity.z} then
+            setvelocity(primarypart, {velocity.x, 50, velocity.z})
+            pressed = true
+        elseif not table.find(keys, "Space") then
+            pressed = false
+        end
+    end
+    
+    wait()
+end
