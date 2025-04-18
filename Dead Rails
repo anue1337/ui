@@ -1,0 +1,182 @@
+_G.Settings = {  
+    ['Items'] = {  
+        ['Enabled'] = true,  
+        ['Max Distance'] = 500,  
+    },  
+    ['Ores'] = {  
+        ['Enabled'] = true,  
+        ['Max Distance'] = 1000,  
+    }  
+}  
+
+local EspCache = {}  
+local Workspace = findservice(Game, "Workspace")  
+local Items = findfirstchild(Workspace, "RuntimeItems")  
+local Ores = findfirstchild(Workspace, "Ore")  
+local Utility = {}  
+
+local Blacklist = {  
+    "Rope", "WantedPoster", "Newspaper", "Teapot", "Painting", "Statue",  
+    "Chair", "Wheel", "Barrel", "Book", "Banjo", "Camera", "Rock", "Vase",  
+    "Lantern", "Tomahawk", "Axe", "Hammer", "Shovel", "Pickaxe", "Cavalry Sword",  
+    "ZombieSheriff", "Walker", "Runner", "ArmoredZombie", "Dynamite",  
+    "VaseTwo", "SheetMetal", "BarbedWire", "MaximGun", "TurretAmmo", "ZombieMiner",
+    "RunnerSoldier", "ZombieSwordSoldier", "ZombieRevolverSoldier", "SkeletonMiner"
+}  
+
+Utility.IsBlacklisted = function(ItemName)  
+    for _, Name in pairs(Blacklist) do  
+        if Name == ItemName then  
+            return true  
+        end 
+    end  
+    return false  
+end
+
+Utility.GetDistance = function(Initial, Target)  
+    local dx = Target.x - Initial.x  
+    local dy = Target.y - Initial.y  
+    local dz = Target.z - Initial.z  
+    return math.sqrt(dx * dx + dy * dy + dz * dz)  
+end
+
+Utility.GetClusteredPosition = function(Position, Index, Total)  
+    local Offset = (Index - Total / 2) * 15  
+    return { Position.x, Position.y + Offset }  
+end
+
+Utility.Render = function()  
+    if not Items or not Ores then return end  
+
+    local Player = getlocalplayer()  
+    local Character = getcharacter(Player)  
+    if not Character then return end  
+
+    local Root = getprimarypart(Character)  
+    if not Root then return end  
+
+    local RootPosition = getposition(Root)  
+    local NearbyItems = {}  
+    local NearbyOres = {}  
+
+    for Instance, Cache in pairs(EspCache) do  
+        local StillExists = false  
+        for _, v in pairs(getchildren(Items)) do  
+            if v == Instance then  
+                StillExists = true  
+                break  
+            end  
+        end  
+        for _, v in pairs(getchildren(Ores)) do  
+            if v == Instance then  
+                StillExists = true  
+                break  
+            end  
+        end  
+        if not StillExists then  
+            if Cache.NameTag then  
+                Cache.NameTag:Remove()  
+            end  
+            EspCache[Instance] = nil  
+        end  
+    end  
+
+    if _G.Settings.Items['Enabled'] then  
+        for _, Instance in pairs(getchildren(Items)) do  
+            local ItemName = getname(Instance)  
+            if Utility.IsBlacklisted(ItemName) then continue end  
+
+            local Part = getprimarypart(Instance)  
+            if not Part then continue end  
+
+            local Position = getposition(Part)  
+            local Distance = Utility.GetDistance(RootPosition, Position)  
+
+            if Distance <= _G.Settings.Items['Max Distance'] then  
+                table.insert(NearbyItems, {Instance = Instance, Position = Position, Name = ItemName, Distance = Distance})  
+            elseif EspCache[Instance] and EspCache[Instance].NameTag then  
+                EspCache[Instance].NameTag.Visible = false  
+            end  
+        end  
+
+        table.sort(NearbyItems, function(a, b) return a.Distance < b.Distance end)  
+
+        for Index, Data in ipairs(NearbyItems) do  
+            local ScreenPosition, OnScreen = worldtoscreenpoint({Data.Position.x, Data.Position.y, Data.Position.z})  
+
+            if OnScreen then  
+                if not EspCache[Data.Instance] then  
+                    local Object = Drawing.new("Text")  
+                    Object.Color = {255, 255, 255}  
+                    Object.Size = 14  
+                    Object.Visible = false
+                    Object.Text = Data.Name  
+                    Object.Outline = true  
+                    Object.OutlineColor = {0, 0, 0}  
+                    Object.Center = true  
+                    EspCache[Data.Instance] = {NameTag = Object}  
+                end  
+
+                local ClusteredPos = Utility.GetClusteredPosition(ScreenPosition, Index, #NearbyItems)  
+                EspCache[Data.Instance].NameTag.Position = ClusteredPos  
+                EspCache[Data.Instance].NameTag.Visible = true  
+                EspCache[Data.Instance].NameTag.Text = Data.Name .. ' | ' .. math.floor(Data.Distance) .. ' m'  
+            else  
+                if EspCache[Data.Instance] and EspCache[Data.Instance].NameTag then  
+                    EspCache[Data.Instance].NameTag.Visible = false  
+                end  
+            end  
+        end  
+    end  
+
+    if _G.Settings.Ores['Enabled'] then  
+        for _, Ore in pairs(getchildren(Ores)) do  
+            local OreName = getname(Ore)  
+            local Part = getprimarypart(Ore)  
+            if not Part then continue end  
+
+            local Position = getposition(Part)  
+            local Distance = Utility.GetDistance(RootPosition, Position)  
+
+            if Distance <= _G.Settings.Ores['Max Distance'] then  
+                table.insert(NearbyOres, {Instance = Ore, Position = Position, Name = OreName, Distance = Distance})  
+            elseif EspCache[Ore] and EspCache[Ore].NameTag then  
+                EspCache[Ore].NameTag.Visible = false  
+            end  
+        end  
+
+        table.sort(NearbyOres, function(a, b) return a.Distance < b.Distance end)  
+
+        for Index, Data in ipairs(NearbyOres) do  
+            local ScreenPosition, OnScreen = worldtoscreenpoint({Data.Position.x, Data.Position.y, Data.Position.z})  
+
+            if OnScreen then  
+                if not EspCache[Data.Instance] then  
+                    local Object = Drawing.new("Text")  
+                    Object.Color = {125, 255, 255}  
+                    Object.Size = 14  
+                    Object.Visible = false  
+                    Object.Text = Data.Name  
+                    Object.Outline = true  
+                    Object.OutlineColor = {0, 0, 0}  
+                    Object.Center = true  
+                    EspCache[Data.Instance] = {NameTag = Object}  
+                end  
+
+                local ClusteredPos = Utility.GetClusteredPosition(ScreenPosition, Index, #NearbyOres)  
+                EspCache[Data.Instance].NameTag.Position = ClusteredPos  
+                EspCache[Data.Instance].NameTag.Visible = true  
+                EspCache[Data.Instance].NameTag.Text = Data.Name .. ' | ' .. math.floor(Data.Distance) .. ' m'  
+            else  
+                if EspCache[Data.Instance] and EspCache[Data.Instance].NameTag then  
+                    EspCache[Data.Instance].NameTag.Visible = false  
+                end  
+            end  
+        end  
+    end  
+end  
+
+while true do  
+    pcall(function() Utility.Render() end)  
+    wait(0.05)  
+end  
