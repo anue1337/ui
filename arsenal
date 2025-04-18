@@ -1,0 +1,20 @@
+local replicatedStorage = findfirstchild(Game, "ReplicatedStorage")
+local weaponsFolder = findfirstchild(replicatedStorage, "Weapons")
+
+if weaponsFolder then
+    local guns = getchildren(weaponsFolder)
+    
+    for _, gun in ipairs(guns) do
+        local fireRate = findfirstchild(gun, "FireRate")
+        local storedammo = findfirstchild(gun, "StoredAmmo")
+        local ammo = findfirstchild(gun, "Ammo")
+        local recoilcontrol = findfirstchild(gun, "RecoilControl")
+       setvalue(recoilcontrol, 0)
+        setvalue(storedammo, 300)
+        setvalue(ammo, 999)
+        setvalue(fireRate, 0.075)
+        print("Modified fire rate for: " .. getname(gun))
+    end
+else
+    print("Weapons folder not found in ReplicatedStorage.")
+end
