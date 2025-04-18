@@ -1,0 +1,178 @@
+-- global vars
+local Players = findfirstchild(Game, "Players")
+local localplayer = getlocalplayer()
+local camera = game.Workspace.Camera
+-- end of global vars
+
+-- flags
+local states = false
+local enabled = true
+-- end of flags
+
+-- functions
+local function isloaded()
+	local character = getcharacter(localplayer)
+	local humanoid = findfirstchild(character, "Humanoid")
+	local gear = findfirstchild(humanoid, "Gear")
+	local playerloadedtable = {character, humanoid, gear}
+	if gear then
+		return true
+	else
+		return false
+	end
+	return false
+end
+
+local function retrieveShifterScript(Char)
+    local PossibleNames = {"FELocal", "ATLocal", "JALocal", "ARLocal", "BELocal", "CALocal", "COLocal"}
+
+    for _, Name in ipairs(PossibleNames) do
+        local Script = findfirstchild(char, Name)
+        if Script then
+            return Name
+        end
+    end
+    return false
+end
+
+local function printwarriornames()
+	for i, v in pairs(getchildren(Players)) do
+		if retrieveShifterScript(getcharacter(v)) then
+			print(retrieveShifterScript(getcharacter(v)) .. " is: " .. getdisplayname(v))
+		end
+	end
+end
+
+local function CalculateDistance(Position1, Position2) -- pasted from globalesp :troll: (i dont like math)
+    return math.sqrt((Position1.x - Position2.x)^2 + (Position1.y - Position2.y)^2 + (Position1.z - Position2.z)^2)
+end
+
+local function setgas(nGas)
+	setvalue(game.Players.localPlayer.Character.Humanoid.Gear.Gas.Data, nGas)
+end
+
+local function setimmortal(bGod)
+	setvalue(game.Players.localPlayer.Character.Humanoid.Invinsible.Data, bGod)
+end
+-- end of functions
+
+-- esp functions
+local attackcolor = {
+	["blade"] = {255, 0, 0},
+	["counter"] = {0, 0, 255},
+	["kick"] = {55, 183, 0}
+}
+local function drawtext(str, objpos)
+	if not objpos then return end
+
+	local screenPoint, onScreen = worldtoscreenpoint({objpos.x, objpos.y, objpos.z})
+	if not onScreen then return end
+
+	local text = Drawing.new("Text")
+
+	text.Text = str
+	text.Color = attackcolor[str]
+	text.Size = 40
+	text.Position = {screenPoint.x, screenPoint.y}
+	text.Visible = true
+end
+
+local function getstate(humanoid)
+	if findfirstchild(humanoid, "SNape") then return "none" end
+	local attackdict = {
+		["blade"] = getvalue(findfirstchild(humanoid, "BladeAttacking")),
+		["kick"] = getvalue(findfirstchild(humanoid, "KickAttacking")),
+		["counter"] = getvalue(findfirstchild(humanoid, "Counter"))
+	}
+
+	for i, v in pairs(attackdict) do
+		if v then
+			print("State is : "..i)
+			return i
+		end
+	end
+
+	return "none"
+end
+
+local function displaystates()
+	for i, v in pairs(getchildren(Players)) do
+		local char = getcharacter(v)
+		local humanoid = findfirstchild(char, "Humanoid")
+		local health = gethealth(humanoid)
+		if char and humanoid and health > 0 and char ~= getcharacter(localplayer) then
+			local state = getstate(humanoid)
+
+			if state ~= "none" then
+				drawtext(state, getposition(findfirstchild(char, "HumanoidRootPart")))
+				wait(0.01)
+				Drawing.clear()
+				return
+			end
+		end
+	end
+end
+-- end of esp functions
+
+-- keycodes and function dictonary
+local DELKEY = "Delete"
+local PGUP = "PageUp"
+local HOME = "Home"
+local PGDN = "PageDown"
+local RIGHTARROW = "RightArrow"
+local bindfunctiondict = {
+	[DELKEY] = function()
+		setgas(60000)
+		print("Setting Gas")
+		wait(0.3)
+	end,
+
+	[PGUP] = function()
+		setimmortal(true)
+		print("Setting Immortal")
+		wait(0.3)
+	end,
+
+	[PGDN] = function()
+		states = not states
+		print("State display " .. tostring(states))
+		wait(0.3)
+	end,
+
+	[HOME] = function()
+		enabled = false
+		print("Script shut down")
+	end,
+
+	[RIGHTARROW] = function()
+		printwarriornames()
+	end
+}
+-- end of keycodes / function dict
+
+-- loop logic
+local function keybindloop()
+	while enabled do
+		local keypressed = getpressedkey()
+		if keypressed and bindfunctiondict[keypressed] and isrbxactive() and isloaded() then
+			bindfunctiondict[keypressed]()
+		end
+		wait()
+	end
+	Drawing.clear()
+end
+
+local function esploop()
+	while enabled do
+		if states then
+			spawn(displaystates)
+		end
+		wait(0.05)
+	end
+	Drawing.clear()
+end
+
+print("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n") -- to clear output console
+spawn(keybindloop)
+spawn(esploop)
+-- end of loop logic
