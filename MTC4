@@ -1,0 +1,36 @@
+local Workspace = findfirstchildofclass(Game, "Workspace")
+local Vehicles = findfirstchild(Workspace, "SpawnedVehicles")
+local LocalPlayer = getlocalplayer()
+
+local function C(Vehicle)
+    local Owner = findfirstchild(Vehicle, "Owner")
+    if Owner and getclassname(Owner) == "ObjectValue" then
+        local OwnerValue = getvalue(Owner)
+        if OwnerValue and getname(OwnerValue) == getname(LocalPlayer) then
+            for _, Descendant in ipairs(getdescendants(Vehicle)) do
+                if getclassname(Descendant) == "IntValue" and getname(Descendant) == "Mag" then
+                    local Val = getvalue(Descendant)
+                    if Val and Val > 0 then
+                        spawn(function()
+                            local StoredVal = Val
+                            while true do
+                                setvalue(Descendant, StoredVal)
+                                wait()
+                            end
+                        end)
+                    end
+                end
+            end
+        end
+    end
+end
+
+spawn(function()
+    while true do
+        for _, Vehicle in ipairs(getchildren(Vehicles)) do
+            C(Vehicle)
+        end
+
+        wait()
+    end
+end)
