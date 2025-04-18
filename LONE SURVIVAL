@@ -1,0 +1,209 @@
+local Settings = {
+    Refresh = 1/90, 
+    NoChangeTime = 5, 
+
+    Text = {
+        Visible = true,
+        Text = "Enemy",
+        OffsetX = 0,
+        OffsetY = 0,
+        Color = {255, 255, 255},
+        Outline = true,
+        OutlineColor = {0, 0, 0},
+        Center = true,
+        Transparency = 0,
+        Font = 1,
+        Size = 10
+    },
+
+    Circle = {
+        Visible = true,
+        Color = {255, 255, 255},
+        Thickness = 1,
+        Transparency = 0,
+        Filled = false
+    }
+}
+
+local findfirstchild     = findfirstchild
+local getchildren        = getchildren
+local getposition        = getposition
+local getsize            = getsize
+local getlocalplayer     = getlocalplayer
+local getname            = getname
+local getparent          = getparent
+local worldtoscreenpoint = worldtoscreenpoint
+local findservice        = findservice
+local isdescendantof     = isdescendantof
+local tick               = tick
+local Drawing            = Drawing
+local wait               = wait
+local spawn              = spawn
+
+local Game      = Game
+local Workspace = findservice(Game, "Workspace")
+
+
+local function CalculateDistance(a, b)
+    return math.floor(math.sqrt(
+        (a.x - b.x)^2 + (a.y - b.y)^2 + (a.z - b.z)^2
+    ))
+end
+
+local function FindMyHead()
+    local player = getlocalplayer()
+    if not player then return nil, "NoLocalPlayer" end
+
+    local myName = getname(player) or "UNKNOWN"
+    local playersFolder = findfirstchild(Workspace, "Players")
+    if playersFolder then
+        local myFolder = findfirstchild(playersFolder, myName)
+        if myFolder then
+            local head = findfirstchild(myFolder, "Head")
+            if head then
+                return head, myName
+            end
+        end
+    end
+    return nil, myName
+end
+
+local function FindAllHeadsExceptMe(myName)
+    local results = {}
+    local playersFolder = findfirstchild(Workspace, "Players")
+    if not playersFolder then return results end
+
+    for _, folder in ipairs(getchildren(playersFolder)) do
+        local folderName = getname(folder)
+        if folderName ~= myName then
+            local head = findfirstchild(folder, "Head")
+            if head then
+                table.insert(results, {
+                    Head = head,
+                    FolderName = folderName
+                })
+            end
+        end
+    end
+    return results
+end
+
+
+local Cache = {}  
+
+local function Refresh(Type, Element, data)
+    if Type == "Text" then
+        Element.Visible      = data.Visible
+        Element.Text         = data.Text
+        Element.Color        = data.Color
+        Element.Outline      = data.Outline
+        Element.OutlineColor = data.OutlineColor
+        Element.Center       = data.Center
+        Element.Font         = data.Font
+        Element.Size         = data.Size
+    elseif Type == "Circle" then
+        Element.Visible      = data.Visible
+        Element.Color        = data.Color
+        Element.Thickness    = data.Thickness
+        Element.Transparency = data.Transparency
+        Element.Filled       = data.Filled
+    end
+end
+
+local function CreateESP(head)
+    local t = Drawing.new("Text")
+    local c = Drawing.new("Circle")
+    
+    Refresh("Text", t, Settings.Text)
+    Refresh("Circle", c, Settings.Circle)
+    
+    Cache[head] = {
+        Text = t,
+        Circle = c,
+        LastDistance = 0,
+        LastChangeTime = tick()
+    }
+end
+
+local function HideESP(head)
+    local cData = Cache[head]
+    if cData then
+        cData.Text.Visible = false
+        cData.Circle.Visible = false
+    end
+end
+
+local function ClearESPIfMissing()
+    for head, v in pairs(Cache) do
+        if not head or getparent(head) == nil or not isdescendantof(head, Workspace) then
+            v.Text.Visible = false
+            v.Circle.Visible = false
+            v.Text:Remove()
+            v.Circle:Remove()
+            Cache[head] = nil
+        end
+    end
+end
+
+local function UpdateHeadESP(myPos, eData)
+    local head       = eData.Head
+    local folderName = eData.FolderName
+    local cData      = Cache[head]
+    if not cData then return false end
+
+    local objPos = getposition(head)
+    if not objPos then
+        HideESP(head)
+        return false
+    end
+    local dist   = CalculateDistance(myPos, objPos)
+
+    local pos2D, onScreen = worldtoscreenpoint({objPos.x, objPos.y, objPos.z})
+    if not onScreen then
+        HideESP(head)
+        return false
+    end
+
+    cData.Text.Visible  = true
+    cData.Text.Position = {
+        pos2D.x + Settings.Text.OffsetX,
+        pos2D.y + Settings.Text.OffsetY
+    }
+    cData.Text.Text = folderName .. " | " .. dist .. "M"
+
+    cData.Circle.Visible  = true
+    cData.Circle.Position = { pos2D.x, pos2D.y }
+
+    local size = getsize(head)
+    if size and size.x and size.y and size.z then
+        local minDim = math.min(size.x, size.y, size.z)
+        cData.Circle.Radius = math.floor(minDim / 2)
+    else
+        cData.Circle.Radius = 10
+    end
+
+    return true
+end
+
+
+
+spawn(function()
+    while wait(Settings.Refresh) do
+        local myHead, myFolderName = FindMyHead()
+        if not myHead then
+        else
+            local myPos = getposition(myHead)
+            local otherHeads = FindAllHeadsExceptMe(myFolderName)
+            for _, eData in ipairs(otherHeads) do
+                if not Cache[eData.Head] then
+                    CreateESP(eData.Head)
+                end
+            end
+            for _, eData in ipairs(otherHeads) do
+                UpdateHeadESP(myPos, eData)
+            end
+        end
+
+        ClearESPIfMissing()
+    end
+end)
