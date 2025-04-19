@@ -138,10 +138,13 @@ end
 local setup_breakables = function(model)
     local mainpart = findfirstchild(model, "MainPart") 
     if not mainpart then return end
-
+    
+    -- Obter o nome real do modelo em vez de usar o nome genérico "Breakable"
+    local model_name = getname(model)
+    
     local cache_temp = {
         root = mainpart,
-        name = "Breakable",
+        name = model_name, -- Usar o nome real do modelo
         text = draw('Text', {Text = '', Size = 12, Font = 5, Color = config.esp.breakables.color, Center = true, Outline = true, Visible = false, Transparency = 1})
     }
 
