@@ -6,30 +6,35 @@ local config = {
             enabled = true,
             max_distance = 1000,
             draw_distance = true,
-            color = {235, 237, 143}  
+            color = {235, 237, 143},
+            radius = 4  -- Raio do círculo
         },
 
         dealers = {
             enabled = true,
             max_distance = 1000,
             draw_distance = true,
-            color = {255, 255, 255}  
+            color = {255, 255, 255},
+            radius = 4  -- Raio do círculo
         },
 
         breakables = {
             enabled = true,
             max_distance = 1000,
             draw_distance = true,
-            color = {0, 204, 63}  
+            color = {0, 204, 63},
+            radius = 4  -- Raio do círculo
         },
 
         atms = {
             enabled = true,
             max_distance = 1000,
             draw_distance = true,
-            color = {93, 163, 233}  
+            color = {93, 163, 233},
+            radius = 4  -- Raio do círculo
         }
-    }      
+    },
+    font = 2  -- Fonte padrão
 }
 
 local mathmax = math.max
@@ -116,7 +121,25 @@ local setup_tools = function(model)
     local cache_temp = {
         root = meshpart,
         name = getloottype(model_name),
-        text = draw('Text', {Text = '', Size = 12, Font = 5, Color = config.esp.tools.color, Center = true, Outline = true, Visible = false, Transparency = 1})
+        text = draw('Text', {
+            Text = '', 
+            Size = 14, 
+            Font = config.font, 
+            Color = config.esp.tools.color, 
+            Center = true, 
+            Outline = true, 
+            Visible = false, 
+            Transparency = 1
+        }),
+        circle = draw('Circle', {
+            Radius = config.esp.tools.radius,
+            Thickness = 1,
+            NumSides = 12,
+            Filled = true,
+            Color = config.esp.tools.color,
+            Transparency = 0.8,
+            Visible = false
+        })
     }
 
     caches.tools[model] = cache_temp
@@ -129,7 +152,25 @@ local setup_dealers = function(model)
     local cache_temp = {
         root = mainpart,
         name = "Armory",
-        text = draw('Text', {Text = '', Size = 12, Font = 5, Color = config.esp.dealers.color, Center = true, Outline = true, Visible = false, Transparency = 1})
+        text = draw('Text', {
+            Text = '', 
+            Size = 14, 
+            Font = config.font, 
+            Color = config.esp.dealers.color, 
+            Center = true, 
+            Outline = true, 
+            Visible = false, 
+            Transparency = 1
+        }),
+        circle = draw('Circle', {
+            Radius = config.esp.dealers.radius,
+            Thickness = 1,
+            NumSides = 12,
+            Filled = true,
+            Color = config.esp.dealers.color,
+            Transparency = 0.8,
+            Visible = false
+        })
     }
 
     caches.dealers[model] = cache_temp
@@ -154,7 +195,25 @@ local setup_breakables = function(model)
     local cache_temp = {
         root = mainpart,
         name = display_name,
-        text = draw('Text', {Text = '', Size = 12, Font = 5, Color = config.esp.breakables.color, Center = true, Outline = true, Visible = false, Transparency = 1})
+        text = draw('Text', {
+            Text = '', 
+            Size = 14, 
+            Font = config.font, 
+            Color = config.esp.breakables.color, 
+            Center = true, 
+            Outline = true, 
+            Visible = false, 
+            Transparency = 1
+        }),
+        circle = draw('Circle', {
+            Radius = config.esp.breakables.radius,
+            Thickness = 1,
+            NumSides = 12,
+            Filled = true,
+            Color = config.esp.breakables.color,
+            Transparency = 0.8,
+            Visible = false
+        })
     }
 
     caches.breakables[model] = cache_temp
@@ -167,7 +226,25 @@ local setup_atms = function(model)
     local cache_temp = {
         root = mainpart,
         name = "ATM",
-        text = draw('Text', {Text = '', Size = 12, Font = 5, Color = config.esp.atms.color, Center = true, Outline = true, Visible = false, Transparency = 1})
+        text = draw('Text', {
+            Text = '', 
+            Size = 14, 
+            Font = config.font, 
+            Color = config.esp.atms.color, 
+            Center = true, 
+            Outline = true, 
+            Visible = false, 
+            Transparency = 1
+        }),
+        circle = draw('Circle', {
+            Radius = config.esp.atms.radius,
+            Thickness = 1,
+            NumSides = 12,
+            Filled = true,
+            Color = config.esp.atms.color,
+            Transparency = 0.8,
+            Visible = false
+        })
     }
 
     caches.atms[model] = cache_temp
@@ -236,6 +313,9 @@ local update_esp = function(cache_type, config_path)
                 if item.text then
                     item.text:Remove()
                 end
+                if item.circle then
+                    item.circle:Remove()
+                end
             end
             break
         end
@@ -243,6 +323,7 @@ local update_esp = function(cache_type, config_path)
         local campos = getposition(camera)
         for index, item in pairs(cache) do
             local text = item.text
+            local circle = item.circle
             local root = item.root
 
             if config_path.enabled and root and isdescendantof(root, workspace) then
@@ -251,16 +332,25 @@ local update_esp = function(cache_type, config_path)
                 local distance_from_camera = mathfloor(getmagnitude(root_pos, campos))
 
                 if root_os and distance_from_camera <= config_path.max_distance then
+                    -- Setup text
                     text.Text = config_path.draw_distance and item.name .. ' [' .. tostring(distance_from_camera) .. 'm]' or item.name
-                    text.Position = {root_vpp.x, root_vpp.y}
+                    text.Position = {root_vpp.x, root_vpp.y + 10} -- Move text down a bit to make room for circle
                     text.Transparency = 1
                     text.Visible = true
+                    
+                    -- Setup circle
+                    circle.Position = {root_vpp.x, root_vpp.y}
+                    circle.Visible = true
                 else
                     text.Visible = false
+                    circle.Visible = false
                 end
             else
                 if text then
                     text.Visible = false
+                end
+                if circle then
+                    circle.Visible = false
                 end
             end
         end
@@ -301,6 +391,9 @@ local cleanup_drawings = function()
         for index, item in pairs(cache) do
             if item.text then
                 item.text:Remove()
+            end
+            if item.circle then
+                item.circle:Remove()
             end
         end
         caches[cache_type] = {}
@@ -444,9 +537,138 @@ local DistanceDisplayToggle = ESPTogglesSection:Toggle({
     end
 })
 
+-- Nova seção para personalização visual do ESP
+local ESPVisualSection = ESPTab:Section({
+    Name = "ESP Visual",
+    Side = "Right"
+})
+
+local CircleRadiusSlider = ESPVisualSection:Slider({
+    Name = "Circle Radius",
+    Min = 1,
+    Max = 10,
+    Default = 4,
+    Increment = 1,
+    Units = "px",
+    Callback = function(Value)
+        config.esp.tools.radius = Value
+        config.esp.dealers.radius = Value
+        config.esp.breakables.radius = Value
+        config.esp.atms.radius = Value
+        
+        -- Atualizar todos os círculos existentes
+        for _, cache in pairs(caches) do
+            for _, item in pairs(cache) do
+                if item.circle then
+                    item.circle.Radius = Value
+                end
+            end
+        end
+    end
+})
+
+local TextSizeSlider = ESPVisualSection:Slider({
+    Name = "Text Size",
+    Min = 10,
+    Max = 20,
+    Default = 14,
+    Increment = 1,
+    Units = "px",
+    Callback = function(Value)
+        -- Atualizar todos os textos existentes
+        for _, cache in pairs(caches) do
+            for _, item in pairs(cache) do
+                if item.text then
+                    item.text.Size = Value
+                end
+            end
+        end
+    end
+})
+
+-- Replace the font toggles with buttons
+local Font0Button = ESPVisualSection:Button({
+    Name = "Font: UI",
+    Callback = function()
+        config.font = 0
+        
+        -- Atualizar fonte de todos os textos existentes
+        for _, cache in pairs(caches) do
+            for _, item in pairs(cache) do
+                if item.text then
+                    item.text.Font = 0
+                end
+            end
+        end
+    end
+})
+
+local Font1Button = ESPVisualSection:Button({
+    Name = "Font: System",
+    Callback = function()
+        config.font = 1
+        
+        -- Atualizar fonte de todos os textos existentes
+        for _, cache in pairs(caches) do
+            for _, item in pairs(cache) do
+                if item.text then
+                    item.text.Font = 1
+                end
+            end
+        end
+    end
+})
+
+local Font2Button = ESPVisualSection:Button({
+    Name = "Font: Plex",
+    Callback = function()
+        config.font = 2
+        
+        -- Atualizar fonte de todos os textos existentes
+        for _, cache in pairs(caches) do
+            for _, item in pairs(cache) do
+                if item.text then
+                    item.text.Font = 2
+                end
+            end
+        end
+    end
+})
+
+local Font3Button = ESPVisualSection:Button({
+    Name = "Font: Monospace",
+    Callback = function()
+        config.font = 3
+        
+        -- Atualizar fonte de todos os textos existentes
+        for _, cache in pairs(caches) do
+            for _, item in pairs(cache) do
+                if item.text then
+                    item.text.Font = 3
+                end
+            end
+        end
+    end
+})
+
+local Font4Button = ESPVisualSection:Button({
+    Name = "Font: Sansserif Bold",
+    Callback = function()
+        config.font = 4
+        
+        -- Atualizar fonte de todos os textos existentes
+        for _, cache in pairs(caches) do
+            for _, item in pairs(cache) do
+                if item.text then
+                    item.text.Font = 4
+                end
+            end
+        end
+    end
+})
 local ESPDistanceSection = ESPTab:Section({
     Name = "ESP Distance",
-    Side = "Right"
+    Side = "Left"
 })
 
 local GlobalDistanceSlider = ESPDistanceSection:Slider({
@@ -581,7 +803,7 @@ local VersionSection = SettingsTab:Section({
 })
 
 local VersionInfo = VersionSection:Button({
-    Name = "Version 1.0.0",
+    Name = "Version 2.0.0",
     Callback = function()
     end
 })
