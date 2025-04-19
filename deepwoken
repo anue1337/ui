@@ -1,534 +1,205 @@
-local config = {
-    allies = {
-        ['example_username'] = true
-    },
-
-    esp = {
-        mobs = {
-            enabled = true,
-            max_distance = 2000,
-            draw_distance = true,
-            color = {229, 123, 189}
-        },
-    
-        humans = {
-            enabled = true,
-            max_distance = 1000,
-            draw_name = true,
-            draw_box = true,
-            draw_health = true,
-            health_percent = true,
-            draw_distance = true,
-    
-            name_color = {229, 196, 114},
-            box_color = {229, 196, 114},
-            health_color = {0, 255, 0}
-        },
-    
-        players = {
-            enabled = true,
-            max_distance = 5000,
-            draw_name = true,
-            draw_box = true,
-            draw_health = true,
-            health_percent = true,
-            draw_distance = true,
-    
-            name_color = {154, 137, 229},
-            box_color = {154, 137, 229},
-            health_color = {205, 126, 229}
-        },
-    
-        chests = {
-            enabled = true,
-            max_distance = 400,
-            draw_distance = true,
-            color = {114, 229, 164}
-        },
-    
-        ally_color = {122, 177, 255},
-        voidwalker_color = {255, 0, 0}
-    }      
-}
-
-local mathmax = math.max
-local mathmin = math.min
-local mathabs = math.abs
-local mathsqrt = math.sqrt
-local mathfloor = math.floor
-local mathround = math.round
-local drawingnew = Drawing.new
-local stringmatch = string.match
-local coroutinewrap = coroutine.wrap
-
-local spawn = spawn
-local getteam = getteam
-local destroy = destroy
-local getname = getname
-local getsize = getsize
-local tostring = tostring
-local gethealth = gethealth
-local getparent = getparent
-local getmeshid = getmeshid
-local getcframe = getcframe
-local isrbxactive = isrbxactive
-local getchildren = getchildren
-local getposition = getposition
-local getupvector = getupvector
-local findservice = findservice
-local getcamerafov = getcamerafov
-local getmaxhealth = getmaxhealth
-local getclassname = getclassname
-local mousemoverel = mousemoverel
-local gettextureid = gettextureid
-local findfirstchild = findfirstchild
-local getlocalplayer = getlocalplayer
-local getmemoryvalue = getmemoryvalue
-local getpressedkeys = getpressedkeys
-local isdescendantof = isdescendantof
-local getmouseposition = getmouseposition
-local getmouselocation = getmouselocation
-local worldtoscreenpoint = worldtoscreenpoint
-local getscreendimensions = getscreendimensions 
-
+local players = findservice(Game, 'Players')
 local workspace = findservice(Game, 'Workspace')
-local player_service = findservice(Game, 'Players')
 
-local stop = false --// for disconnecting
-local camera = findfirstchild(workspace, 'Camera')
+local live_folder = findfirstchild(workspace, 'Live')
+local thrown_folder = findfirstchild(workspace, 'Thrown')
+
 local localplayer = getlocalplayer()
-local localplayername = getname(localplayer)
+local localname = getname(localplayer)
 
-local caches = {
-    live = {},
-    chests = {}
-}
-
-local folders = {
-    live = findfirstchild(workspace, 'Live'),
-    thrown = findfirstchild(workspace, 'Thrown')
-}
-
-local draw = function(class, props)
-    local obj = drawingnew(class)
-    for i, prop in props do
-        obj[i] = prop
-    end
-    return obj
-end
-
-local getboxsize = function(torso) --// not made by me
-    local cf = getcframe(torso)
-    local uv = cf.upvector
-    local pos = cf.position
-    local cam_uv = getupvector(camera)
-
-    local top = {
-        pos.x + uv.x * 1.8 + cam_uv.x,
-        pos.y + uv.y * 1.8 + cam_uv.y,
-        pos.z + uv.z * 1.8 + cam_uv.z
+local cache = {}
+local function setup_entity(primary, class)
+    local temp = {
+        primary = primary,
+        class = class
     }
 
-    local bottom = {
-        pos.x - uv.x * 2.5 - cam_uv.x,
-        pos.y - uv.y * 2.5 - cam_uv.y,
-        pos.z - uv.z * 2.5 - cam_uv.z
-    }
+    if class == 'live' then
+        local humanoid = findfirstchild(primary, 'Humanoid')
+        if not humanoid then 
+            return
+        end
 
-    local top_vp, top_visible = worldtoscreenpoint(top)
-    local bottom_vp, bottom_visible = worldtoscreenpoint(bottom)
+        local rootpart = findfirstchild(primary, 'HumanoidRootPart')
+        if not rootpart then 
+            return 
+        end
 
-    if top_visible and bottom_visible then
-        local width = mathmax(mathabs(top_vp.x - bottom_vp.x), 3)
-        local height = mathmax(mathabs(bottom_vp.y - top_vp.y), 3)
+        temp.humanoid = humanoid
+        temp.rootpart = rootpart
 
-        local size = {
-            x = mathfloor(mathmax(height / 1.8, width)),
-            y = mathfloor(height)
-        }
-
-        local position = {
-            x = mathfloor((top_vp.x + bottom_vp.x) * 0.5 - size.x * 0.5),
-            y = mathfloor(mathmin(top_vp.y, bottom_vp.y))
-        }
-
-        return size, position
-    end
-
-    return {x = 0, y = 0}, {x = 0, y = 0}
-end
-
-local getmagnitude = function(a, b)
-    local dx, dy = a.x - b.x, a.y - b.y
-    local dz = (a.z and b.z) and (a.z - b.z) or nil
-
-    if dz then
-        return math.sqrt(dx * dx + dy * dy + dz * dz)
-    else
-        return math.sqrt(dx * dx + dy * dy)
-    end
-end
-
-local setup_live = function(character)
-    local cache_temp = {
-        drawings = {}
-    }
-
-    local humanoid = findfirstchild(character, 'Humanoid')
-    if not humanoid then 
-        return
-    end
-
-    local rootpart = findfirstchild(character, 'HumanoidRootPart')
-    if not rootpart then 
-        return 
-    end
-
-    cache_temp.Humanoid = humanoid
-    cache_temp.HumanoidRootPart = rootpart
-
-    local torso = findfirstchild(character, 'Torso')
-    local shirt = findfirstchild(character, 'Shirt')
-    local class_type = 'mobs' --// default class
-    
-    local character_name = getname(character)
-    if (torso and shirt) then --// human check
-        local is_player = findfirstchild(player_service, character_name)
+        local name = getname(primary)
+        local torso = findfirstchild(primary, 'Torso')
+        local shirt = findfirstchild(primary, 'Shirt')
+        local _class = 'mob'
         
-        if is_player then
-            class_type = 'players'
-            cache_temp.name = character_name
+        if (torso and shirt) then
+            local is_player = findfirstchild(players, name)
+            _class = 'human'
+
+            local health = gethealth(humanoid)
+            temp.health = health
+
+            local new = is_player and name or string.match(name, '([%a_]+)')
+            local data = {
+                Username = new,
+                Displayname = new,
+                Userid = 0,
+                Character = primary,
+                PrimaryPart = rootpart,
+                Humanoid = humanoid,
+                Head = findfirstchild(primary, 'Head') or rootpart,
+                Torso = findfirstchild(primary, 'Torso') or rootpart,
+                LeftArm = findfirstchild(primary, 'Left Arm') or rootpart,
+                LeftLeg = findfirstchild(primary, 'Left Leg') or rootpart,
+                RightArm = findfirstchild(primary, 'Right Arm') or rootpart,
+                RightLeg = findfirstchild(primary, 'Right Leg') or rootpart,
+                BodyHeightScale = 1,
+                RigType = 0,
+                Whitelisted = false,
+                Archenemies = false,
+                Aimbot_Part = rootpart,
+                Aimbot_TP_Part = rootpart,
+                Triggerbot_Part = rootpart,
+                Health = health,
+                MaxHealth = getmaxhealth(humanoid)
+            }
+    
+            add_model_data(data, tostring(primary))
         else
-            class_type = 'humans'
-            cache_temp.name = stringmatch(character_name, '([%a_]+)')
+            local new = string.match(name, '([%a_]+)')
+            local data = {
+                Username = new,
+                Displayname = new,
+                Userid = 0,
+                Character = primary,
+                PrimaryPart = rootpart,
+                Humanoid = humanoid,
+                Head = rootpart,
+                LeftLeg = rootpart,
+                LeftArm = rootpart,
+                RightLeg = rootpart,
+                RightArm = rootpart,
+                BodyHeightScale = 1,
+                Torso = rootpart,
+                RigType = 0,
+                Whitelisted = false,
+                Archenemies = false,
+                Aimbot_Part = rootpart,
+                Aimbot_TP_Part = rootpart,
+                Triggerbot_Part = rootpart,
+                Health = gethealth(humanoid),
+                MaxHealth = getmaxhealth(humanoid)
+            }
+    
+            add_model_data(data, tostring(primary))
         end
 
-        cache_temp.Torso = torso
-    else
-        cache_temp.name = stringmatch(character_name, '([%a_]+)')
-    end
-
-    cache_temp.class = class_type
-    if class_type == 'humans' then
-        local config_path = config.esp.humans
-
-        cache_temp.drawings = {
-            box_fill = draw('Square', {Color = config_path.box_color, Thickness = 1, Transparency = 0.2, Filled = true, Visible = false}),
-            box_outline = draw('Square', {Color = {0, 0, 0}, Thickness = 3, Transparency = 1, Visible = false}),
-            box = draw('Square', {Color = config_path.box_color, Thickness = 1, Transparency = 1, Visible = false}),
-            health_outline = draw('Square', {Color = {0, 0, 0}, Filled = true, Thickness = 1, Transparency = 1, Visible = false}),
-            health = draw('Square', {Color = config_path.health_color, Filled = true, Thickness = 1, Transparency = 1, Visible = false}),
-            health_text = draw('Text', {Color = {255, 255, 255}, Transparency = 1, Size = 12, Text = '', Font = 5, Outline = true, Center = true, Visible = false}),
-            name_text = draw('Text', {Color = config_path.name_color, Transparency = 1, Size = 12, Text = '', Font = 5, Outline = true, Center = true, Visible = false})
-        }
-        
-        caches.live[character] = cache_temp
-    elseif class_type == 'players' then
-        local config_path = config.esp.players
-        local is_ally = config.allies[character_name]
-
-        cache_temp.drawings = {
-            box_fill = draw('Square', {Color = is_ally and config.esp.ally_color or config_path.box_color, Thickness = 1, Transparency = 0.2, Filled = true, Visible = false}),
-            box_outline = draw('Square', {Color = {0, 0, 0}, Thickness = 3, Transparency = 1, Visible = false}),
-            box = draw('Square', {Color = is_ally and config.esp.ally_color or config_path.box_color, Thickness = 1, Transparency = 1, Visible = false}),
-            health_outline = draw('Square', {Color = {0, 0, 0}, Filled = true, Thickness = 1, Transparency = 1, Visible = false}),
-            health = draw('Square', {Color = is_ally and config.esp.ally_color or config_path.health_color, Filled = true, Thickness = 1, Transparency = 1, Visible = false}),
-            health_text = draw('Text', {Color = {255, 255, 255}, Transparency = 1, Size = 12, Text = '', Font = 5, Outline = true, Center = true, Visible = false}),
-            name_text = draw('Text', {Color = is_ally and config.esp.ally_color or config_path.name_color, Transparency = 1, Size = 12, Text = '', Font = 5, Outline = true, Center = true, Visible = false}),
-            flag_text = draw('Text', {Color = config.esp.voidwalker_color, Transparency = 1, Size = 12, Text = '', Font = 5, Outline = true, Visible = false})
-        }
-        
-        caches.live[character] = cache_temp
-    elseif class_type == 'mobs' then
-        local mobs_config = config.esp.mobs
-
-        cache_temp.drawings = {
-            text = draw('Text', {Text = '', Size = 12, Font = 5, Color = mobs_config.color, Center = true, Outline = true, Visible = false, Transparency = 1})
+        temp._class = _class
+        cache[tostring(primary)] = temp
+    elseif class == 'chest' then
+        local temp = {
+            primary = primary,
+            class = class
         }
 
-        caches.live[character] = cache_temp
+        local rootpart = findfirstchild(primary, 'RootPart')
+        if not rootpart then 
+            return 
+        end
+
+        temp.rootpart = rootpart
+
+        local data = {
+            Username = 'Chest',
+            Displayname = 'Chest',
+            Userid = 0,
+            Character = primary,
+            PrimaryPart = rootpart,
+            Humanoid = rootpart,
+            Head = rootpart,
+            Torso = rootpart,
+            LeftArm = rootpart,
+            LeftLeg = rootpart,
+            RightArm = rootpart,
+            RightLeg = rootpart,
+            BodyHeightScale = 1,
+            RigType = 0,
+            Whitelisted = false,
+            Archenemies = false,
+            Aimbot_Part = rootpart,
+            Aimbot_TP_Part = rootpart,
+            Triggerbot_Part = rootpart,
+            Health = 100,
+            MaxHealth = 100
+        }
+
+        add_model_data(data, tostring(primary))
+        cache[tostring(primary)] = temp
     end
 end
 
-local load_caches = function()
-    local live_cache = caches.live
-    local live_folder = folders.live
-    
-    local chest_cache = caches.chests
-    local thrown_folder = folders.thrown
-
-    while true do
-        if stop then
-            break
-        end
-        
+local function setup_cache()
+    while wait(1 / 30) do
         for _, child in getchildren(live_folder) do
-            if getname(child) ~= localplayername then
-                if not live_cache[child] then
-                    setup_live(child)
-                end
+            if getname(child) ~= localname and not cache[tostring(child)]  then
+                setup_entity(child, 'live')
             end
         end
-        
-        for _, child in getchildren(thrown_folder) do --// setting up chests
+
+        for _, child in getchildren(thrown_folder) do
             if getclassname(child) == 'Model' then
                 local lid = findfirstchild(child, 'Lid')
-                local root = findfirstchild(child, 'RootPart')
-                if (lid and root) and (not chest_cache[lid]) then
-                    local cache_temp = {
-                        root = lid,
-                        text = draw('Text', {Text = '', Size = 12, Font = 5, Color = config.esp.chests.color, Center = true, Outline = true, Visible = false, Transparency = 1})
+                if lid and not cache[tostring(child)] then
+                    setup_entity(child, 'chest')
+                end
+            end
+        end
+    end
+end
+
+local function updater()
+    while wait(1 / 240) do
+        for index, entry in cache do
+            if entry.class == 'live' then
+                local _class = entry._class
+                local rootpart = entry.rootpart
+                local humanoid = entry.humanoid
+
+                if rootpart and isdescendantof(entry.primary, live_folder) then
+                    local data = {
+                        MaxHealth = getmaxhealth(humanoid)
                     }
-                
-                    caches.chests[lid] = cache_temp
-                end 
-            end
-        end
 
-        wait(1 / 30)
-    end
-end
-
-local update_live = function() --// updating live drawings
-    local live_folder = folders.live
-    local live_cache = caches.live
-
-    while wait(1 / 240) do
-        if stop then
-            for index, cache in live_cache do
-                local drawings = cache['drawings']
-                for _, v in drawings do
-                    v:Remove()
-                end
-            end
-
-            break
-        end
-
-        local campos = getposition(camera)
-        for index, cache in live_cache do
-            local name = cache.name
-            local class = cache.class
-            local drawings = cache.drawings
-            local humanoid = cache.Humanoid
-            local rootpart = cache.HumanoidRootPart
-            local config_path = config.esp[class]
-
-            if config_path.enabled and rootpart and isdescendantof(rootpart, live_folder) then
-                local root_pos = getposition(rootpart)
-                local root_vpp, root_os = worldtoscreenpoint({root_pos.x, root_pos.y, root_pos.z})
-
-                local max_distance = config_path.max_distance
-                local distance_from_camera = mathfloor(getmagnitude(root_pos, campos))
-
-                if root_os and distance_from_camera <= max_distance then
-                    local health = mathfloor(gethealth(humanoid))
-                    local maxhealth = mathfloor(getmaxhealth(humanoid))
-
-                    if class == 'humans' then
-                        local box_size, box_position = getboxsize(cache.Torso)
-
-                        local box = drawings['box']
-                        box.Size = {box_size.x, box_size.y}
-                        box.Position = {box_position.x, box_position.y}
-                        box.Transparency = 1
-                        box.Visible = config_path.draw_box
-    
-                        local box_fill = drawings['box_fill']
-                        box_fill.Size = {box_size.x, box_size.y}
-                        box_fill.Position = {box_position.x, box_position.y}
-                        box_fill.Transparency = 0.1
-                        box_fill.Visible = config_path.draw_box
-    
-                        local box_outline = drawings['box_outline']
-                        box_outline.Size = {box_size.x, box_size.y}
-                        box_outline.Position = {box_position.x, box_position.y}
-                        box_outline.Transparency = 1
-                        box_outline.Visible = config_path.draw_box
-
-                        local hsize = health <= 0 and 0 or mathmax(1, mathfloor(box_size.y * (health / maxhealth)))
-                        local health_inner = drawings['health']
-                        health_inner.Size = {2, hsize}
-                        health_inner.Position = {box_position.x - 6, box_position.y + (box_size.y - hsize)}
-                        health_inner.Transparency = 1
-                        health_inner.Visible = config_path.draw_health
-
-                        local health_outline = drawings['health_outline']
-                        health_outline.Size = {4, box_size.y + 2}
-                        health_outline.Position = {box_position.x - 7, box_position.y - 1}
-                        health_outline.Transparency = 1
-                        health_outline.Visible = config_path.draw_health
-
-                        local health_text = drawings['health_text']
-                        if health < maxhealth then
-                            health_text.Text = config_path.health_percent and tostring(mathround((health / maxhealth) * 100)) .. '%' or tostring(health)
-                            health_text.Position = {box_position.x - (9 + (health_text.TextBounds.x / 2)), box_position.y + (box_size.y - hsize) - 6}
-                            health_text.Transparency = 1
-                            health_text.Visible = config_path.draw_health
-                        else
-                            health_text.Visible = false
-                        end
-
-                        local name_text = drawings['name_text']
-                        name_text.Text = config_path.draw_distance and cache.name .. ' [' .. tostring(distance_from_camera) .. 'm]' or cache.name
-                        name_text.Position = {box_position.x + (box_size.x / 2), box_position.y - 14}
-                        name_text.Transparency = 1
-                        name_text.Visible = config_path.draw_name
-                    elseif class == 'players' then
-                        local box_size, box_position = getboxsize(cache.Torso)
-
-                        local box = drawings['box']
-                        box.Size = {box_size.x, box_size.y}
-                        box.Position = {box_position.x, box_position.y}
-                        box.Transparency = 1
-                        box.Visible = config_path.draw_box
-    
-                        local box_fill = drawings['box_fill']
-                        box_fill.Size = {box_size.x, box_size.y}
-                        box_fill.Position = {box_position.x, box_position.y}
-                        box_fill.Transparency = 0.1
-                        box_fill.Visible = config_path.draw_box
-    
-                        local box_outline = drawings['box_outline']
-                        box_outline.Size = {box_size.x, box_size.y}
-                        box_outline.Position = {box_position.x, box_position.y}
-                        box_outline.Transparency = 1
-                        box_outline.Visible = config_path.draw_box
-
-                        local hsize = health <= 0 and 0 or mathmax(1, mathfloor(box_size.y * (health / maxhealth)))
-                        local health_inner = drawings['health']
-                        health_inner.Size = {2, hsize}
-                        health_inner.Position = {box_position.x - 6, box_position.y + (box_size.y - hsize)}
-                        health_inner.Transparency = 1
-                        health_inner.Visible = config_path.draw_health
-
-                        local health_outline = drawings['health_outline']
-                        health_outline.Size = {4, box_size.y + 2}
-                        health_outline.Position = {box_position.x - 7, box_position.y - 1}
-                        health_outline.Transparency = 1
-                        health_outline.Visible = config_path.draw_health
-
-                        local health_text = drawings['health_text']
-                        if health < maxhealth then
-                            health_text.Text = config_path.health_percent and tostring(mathround((health / maxhealth) * 100)) .. '%' or tostring(health)
-                            health_text.Position = {box_position.x - (9 + (health_text.TextBounds.x / 2)), box_position.y + (box_size.y - hsize) - 6}
-                            health_text.Transparency = 1
-                            health_text.Visible = config_path.draw_health
-                        else
-                            health_text.Visible = false
-                        end
-
-                        local name_text = drawings['name_text']
-                        name_text.Text = config_path.draw_distance and cache.name .. ' [' .. tostring(distance_from_camera) .. 'm]' or cache.name
-                        name_text.Position = {box_position.x + (box_size.x / 2), box_position.y - 14}
-                        name_text.Transparency = 1
-                        name_text.Visible = config_path.draw_name
-
-                        local flag_text = drawings['flag_text']
-                        if findfirstchild(rootpart, 'GraspPassiveParticle') then
-                            flag_text.Text = 'Voidwalker'
-                            flag_text.Position = {box_position.x + box_size.x + 3, box_position.y - 3}
-                            flag_text.Transparency = 1
-                            flag_text.Visible = true
-                        else
-                            flag_text.Visible = false
-                        end
-                    elseif class == 'mobs' then
-                        local main_text = drawings['text']
-                        main_text.Text = config_path.draw_distance and name .. ' [' .. tostring(health) .. '/' .. tostring(maxhealth) .. '] ' .. '[' .. tostring(distance_from_camera) .. 'm]' or name .. ' [' .. tostring(health) .. '/' .. tostring(maxhealth) .. ']'
-                        main_text.Position = {root_vpp.x, root_vpp.y}
-                        main_text.Transparency = 1
-                        main_text.Visible = true
+                    local _health = gethealth(humanoid)
+                    if _health ~= entry.health then
+                        data.Health = _health
+                        entry.health = _health
                     end
-                else
-                    for _, v in drawings do
-                        v.Visible = false
+
+                    if _class == 'human' and findfirstchild(rootpart, 'GraspPassiveParticle') then
+                        data.Archenemies = true
+                    else
+                        data.Archenemies = false
                     end
-                end
-            else
-                for _, v in drawings do
-                    v:Remove()
-                end
 
-                drawings = {}
-                live_cache[index] = nil
-
-                continue
-            end
-        end
-    end
-end
-
-local update_chests = function() --// updating chest drawings
-    local chest_cache = caches.chests
-
-    while wait(1 / 240) do
-        if stop then
-            for index, cache in chest_cache do
-                local text = cache.text
-                if text then
-                    text:Remove()
-                end
-            end
-
-            break
-        end
-
-        local chest_config = config.esp.chests
-        local max_distance = chest_config.max_distance
-        for index, cache in chest_cache do
-            local text = cache.text
-            local root = cache.root
-            if chest_config.enabled and root and isdescendantof(root, workspace) then
-                local campos = getposition(camera)
-                local root_pos = getposition(root)
-                local root_vpp, root_os = worldtoscreenpoint({root_pos.x, root_pos.y, root_pos.z})
-                local distance_from_camera = mathfloor(getmagnitude(root_pos, campos))
-
-                if root_os and distance_from_camera <= max_distance then
-                    text.Text = chest_config.draw_distance and 'Chest [' .. tostring(distance_from_camera) .. 'm]' or 'Chest'
-                    text.Position = {root_vpp.x, root_vpp.y}
-                    text.Transparency = 1
-                    text.Visible = true
+                    edit_model_data(data, index)
                 else
-                    text.Visible = false
+                    remove_model_data(index)
+                    cache[index] = nil
+                    continue
                 end
-            else
-                local text = cache.text
-                if text then
-                    text:Remove()
+            elseif entry.class == 'chest' then
+                local rootpart = entry.rootpart
+                if not rootpart and not isdescendantof(entry.primary, thrown_folder) then
+                    remove_model_data(index)
+                    cache[index] = nil
+                    continue
                 end
-
-                text = nil
-                chest_cache[index] = nil
-
-                continue
             end
         end
     end
 end
 
-local disconnect_scan = function() --// checking pressed keys for disconnecting
-    while wait(1 / 30) do
-        if isrbxactive() then
-            local pressed = getpressedkeys()
-
-            local found = false
-            for _, value in pressed do
-                if value == 'OEM_6' then --// right bracket
-                    found = true
-                end
-            end
-    
-            if found then
-                stop = true
-                break
-            end
-        end
-    end
-end
-
-spawn(load_caches)
-spawn(update_live)
-spawn(update_chests)
-spawn(disconnect_scan)
+spawn(setup_cache)
+spawn(updater)
