@@ -7,7 +7,7 @@ local config = {
             max_distance = 1000,
             draw_distance = true,
             color = {235, 237, 143},
-            radius = 4  -- Raio do círculo
+            radius = 4  
         },
 
         dealers = {
@@ -15,7 +15,7 @@ local config = {
             max_distance = 1000,
             draw_distance = true,
             color = {255, 255, 255},
-            radius = 4  -- Raio do círculo
+            radius = 4  
         },
 
         breakables = {
@@ -23,7 +23,7 @@ local config = {
             max_distance = 1000,
             draw_distance = true,
             color = {0, 204, 63},
-            radius = 4  -- Raio do círculo
+            radius = 4  
         },
 
         atms = {
@@ -31,10 +31,10 @@ local config = {
             max_distance = 1000,
             draw_distance = true,
             color = {93, 163, 233},
-            radius = 4  -- Raio do círculo
+            radius = 4  
         }
     },
-    font = 2  -- Fonte padrão
+    font = 2  
 }
 
 local mathmax = math.max
@@ -332,13 +332,12 @@ local update_esp = function(cache_type, config_path)
                 local distance_from_camera = mathfloor(getmagnitude(root_pos, campos))
 
                 if root_os and distance_from_camera <= config_path.max_distance then
-                    -- Setup text
+
                     text.Text = config_path.draw_distance and item.name .. ' [' .. tostring(distance_from_camera) .. 'm]' or item.name
-                    text.Position = {root_vpp.x, root_vpp.y + 10} -- Move text down a bit to make room for circle
+                    text.Position = {root_vpp.x, root_vpp.y + 10} 
                     text.Transparency = 1
                     text.Visible = true
-                    
-                    -- Setup circle
+
                     circle.Position = {root_vpp.x, root_vpp.y}
                     circle.Visible = true
                 else
@@ -537,7 +536,6 @@ local DistanceDisplayToggle = ESPTogglesSection:Toggle({
     end
 })
 
--- Nova seção para personalização visual do ESP
 local ESPVisualSection = ESPTab:Section({
     Name = "ESP Visual",
     Side = "Right"
@@ -555,8 +553,7 @@ local CircleRadiusSlider = ESPVisualSection:Slider({
         config.esp.dealers.radius = Value
         config.esp.breakables.radius = Value
         config.esp.atms.radius = Value
-        
-        -- Atualizar todos os círculos existentes
+
         for _, cache in pairs(caches) do
             for _, item in pairs(cache) do
                 if item.circle then
@@ -575,7 +572,7 @@ local TextSizeSlider = ESPVisualSection:Slider({
     Increment = 1,
     Units = "px",
     Callback = function(Value)
-        -- Atualizar todos os textos existentes
+
         for _, cache in pairs(caches) do
             for _, item in pairs(cache) do
                 if item.text then
@@ -586,13 +583,11 @@ local TextSizeSlider = ESPVisualSection:Slider({
     end
 })
 
--- Replace the font toggles with buttons
 local Font0Button = ESPVisualSection:Button({
     Name = "Font: UI",
     Callback = function()
         config.font = 0
-        
-        -- Atualizar fonte de todos os textos existentes
+
         for _, cache in pairs(caches) do
             for _, item in pairs(cache) do
                 if item.text then
@@ -607,8 +602,7 @@ local Font1Button = ESPVisualSection:Button({
     Name = "Font: System",
     Callback = function()
         config.font = 1
-        
-        -- Atualizar fonte de todos os textos existentes
+
         for _, cache in pairs(caches) do
             for _, item in pairs(cache) do
                 if item.text then
@@ -623,8 +617,7 @@ local Font2Button = ESPVisualSection:Button({
     Name = "Font: Plex",
     Callback = function()
         config.font = 2
-        
-        -- Atualizar fonte de todos os textos existentes
+
         for _, cache in pairs(caches) do
             for _, item in pairs(cache) do
                 if item.text then
@@ -639,8 +632,7 @@ local Font3Button = ESPVisualSection:Button({
     Name = "Font: Monospace",
     Callback = function()
         config.font = 3
-        
-        -- Atualizar fonte de todos os textos existentes
+
         for _, cache in pairs(caches) do
             for _, item in pairs(cache) do
                 if item.text then
@@ -655,8 +647,7 @@ local Font4Button = ESPVisualSection:Button({
     Name = "Font: Sansserif Bold",
     Callback = function()
         config.font = 4
-        
-        -- Atualizar fonte de todos os textos existentes
+
         for _, cache in pairs(caches) do
             for _, item in pairs(cache) do
                 if item.text then
