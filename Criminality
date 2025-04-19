@@ -143,32 +143,23 @@ local setup_breakables = function(model)
     local model_name = getname(model)
     
 
-    local display_name = model_name
-    local underscore_pos = string.find(model_name, "_")
-    if underscore_pos then
-        display_name = string.sub(model_name, 1, underscore_pos - 1)
+    local display_name = "Breakable"
+    
+    if string.find(model_name, "Register") then
+        display_name = "Register"
+    elseif string.find(model_name, "SmallSafe") then
+        display_name = "SmallSafe"
+    elseif string.find(model_name, "MediumSafe") then
+        display_name = "MediumSafe"
     end
     
     local cache_temp = {
         root = mainpart,
-        name = display_name, -- Usar apenas a parte do nome antes do "_"
+        name = display_name,
         text = draw('Text', {Text = '', Size = 12, Font = 5, Color = config.esp.breakables.color, Center = true, Outline = true, Visible = false, Transparency = 1})
     }
 
     caches.breakables[model] = cache_temp
-end
-
-local setup_atms = function(model)
-    local mainpart = findfirstchild(model, "MainPart")
-    if not mainpart then return end
-
-    local cache_temp = {
-        root = mainpart,
-        name = "ATM",
-        text = draw('Text', {Text = '', Size = 12, Font = 5, Color = config.esp.atms.color, Center = true, Outline = true, Visible = false, Transparency = 1})
-    }
-
-    caches.atms[model] = cache_temp
 end
 
 local threads = {}
