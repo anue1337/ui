@@ -783,7 +783,7 @@ local CreditsInfo = CreditsSection:Button({
 })
 
 local CreditsInfo2 = CreditsSection:Button({
-    Name = "UI Made by king bob",
+    Name = "UI Lib made by king bob",
     Callback = function()
     end
 })
