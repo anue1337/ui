@@ -1,5 +1,5 @@
-local uilibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/DCHARLESAKAMRGREEN/Severe-Luas/refs/heads/main/Severe%20UI%20Library.lua"))()
-local esplib = loadstring(game:HttpGet("https://raw.githubusercontent.com/anue1337/lib/refs/heads/main/esp"))()
+local UiLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/DCHARLESAKAMRGREEN/Severe-Luas/refs/heads/main/Severe%20UI%20Library.lua"))()
+local EspLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/anue1337/lib/refs/heads/main/esp2"))()
 
 local config = {
     esp = {
@@ -139,11 +139,13 @@ end
 local setup_breakables = function(model)
     local mainpart = findfirstchild(model, "MainPart") 
     if not mainpart then return end
+    
 
     local model_name = getname(model)
+    
 
-    local display_name = "Breakable" 
-
+    local display_name = "Breakable"
+    
     if string.find(model_name, "Register") then
         display_name = "Register"
     elseif string.find(model_name, "SmallSafe") then
@@ -151,7 +153,7 @@ local setup_breakables = function(model)
     elseif string.find(model_name, "MediumSafe") then
         display_name = "MediumSafe"
     end
-
+    
     local cache_temp = {
         root = mainpart,
         name = display_name,
@@ -159,19 +161,6 @@ local setup_breakables = function(model)
     }
 
     caches.breakables[model] = cache_temp
-end
-
-local setup_atms = function(model)
-    local mainpart = findfirstchild(model, "MainPart")
-    if not mainpart then return end
-
-    local cache_temp = {
-        root = mainpart,
-        name = "ATM",
-        text = draw('Text', {Text = '', Size = 12, Font = 5, Color = config.esp.atms.color, Center = true, Outline = true, Visible = false, Transparency = 1})
-    }
-
-    caches.atms[model] = cache_temp
 end
 
 local threads = {}
@@ -298,6 +287,7 @@ local disconnect_scan = function()
 end
 
 local cleanup_drawings = function()
+
     for cache_type, cache in pairs(caches) do
         for index, item in pairs(cache) do
             if item.text then
@@ -313,6 +303,7 @@ local UI = nil
 local isUnloading = false
 
 local unload_script = function()
+
     if isUnloading then return end
 
     isUnloading = true
@@ -332,6 +323,7 @@ local unload_script = function()
 
     if UI and typeof(UI) == "table" then
         pcall(function()
+
             if typeof(UI.Unload) == "function" then
                 UI:Unload()
             end
@@ -530,10 +522,14 @@ local SettingsSection = SettingsTab:Section({
 local UnloadButton = SettingsSection:Button({
     Name = "Unload Script",
     Callback = function()
+
         if isUnloading then return end
+
         pcall(unload_script)
+
         spawn(function()
             wait(0.5)
+
             pcall(function()
                 if Drawing and typeof(Drawing.clear) == "function" then
                     Drawing.clear()
@@ -556,6 +552,7 @@ local HotkeySection = SettingsTab:Section({
 local HotkeyInfo = HotkeySection:Button({
     Name = "Press 'P' to Open/Close UI",
     Callback = function()
+
     end
 })
 
@@ -567,12 +564,14 @@ local CreditsSection = SettingsTab:Section({
 local CreditsInfo = CreditsSection:Button({
     Name = "Made by anue",
     Callback = function()
+
     end
 })
 
-local CreditsInfo2 = CreditsSection:Button({
+local CreditsInfo = CreditsSection:Button({
     Name = "UI Made by king bob",
     Callback = function()
+
     end
 })
 
@@ -584,6 +583,7 @@ local VersionSection = SettingsTab:Section({
 local VersionInfo = VersionSection:Button({
     Name = "Version 1.0.0",
     Callback = function()
+
     end
 })
 
