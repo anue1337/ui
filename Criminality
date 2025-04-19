@@ -1,0 +1,601 @@
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/DCHARLESAKAMRGREEN/Severe-Luas/refs/heads/main/Severe%20UI%20Library.lua"))()
+
+local config = {
+    esp = {
+        tools = {
+            enabled = true,
+            max_distance = 1000,
+            draw_distance = true,
+            color = {235, 237, 143}  
+        },
+
+        dealers = {
+            enabled = true,
+            max_distance = 1000,
+            draw_distance = true,
+            color = {255, 255, 255}  
+        },
+
+        breakables = {
+            enabled = true,
+            max_distance = 1000,
+            draw_distance = true,
+            color = {0, 204, 63}  
+        },
+
+        atms = {
+            enabled = true,
+            max_distance = 1000,
+            draw_distance = true,
+            color = {93, 163, 233}  
+        }
+    }      
+}
+
+local mathmax = math.max
+local mathmin = math.min
+local mathabs = math.abs
+local mathsqrt = math.sqrt
+local mathfloor = math.floor
+local mathround = math.round
+local drawingnew = Drawing.new
+local stringmatch = string.match
+local coroutinewrap = coroutine.wrap
+
+local spawn = spawn
+local destroy = destroy
+local getname = getname
+local getsize = getsize
+local tostring = tostring
+local getparent = getparent
+local getcframe = getcframe
+local isrbxactive = isrbxactive
+local getchildren = getchildren
+local getposition = getposition
+local findservice = findservice
+local getclassname = getclassname
+local findfirstchild = findfirstchild
+local getlocalplayer = getlocalplayer
+local getpressedkeys = getpressedkeys
+local isdescendantof = isdescendantof
+local worldtoscreenpoint = worldtoscreenpoint
+
+local workspace = findservice(Game, 'Workspace')
+
+local stop = false 
+local camera = findfirstchild(workspace, 'Camera')
+local localplayer = getlocalplayer()
+
+local caches = {
+    tools = {},
+    dealers = {},
+    breakables = {},
+    atms = {}
+}
+
+local folders = {
+    map = findfirstchild(workspace, 'Map'),
+    filter = findfirstchild(workspace, 'Filter')
+}
+
+local draw = function(class, props)
+    local obj = drawingnew(class)
+    for i, prop in pairs(props) do
+        obj[i] = prop
+    end
+    return obj
+end
+
+local getmagnitude = function(a, b)
+    local dx, dy = a.x - b.x, a.y - b.y
+    local dz = (a.z and b.z) and (a.z - b.z) or nil
+
+    if dz then
+        return mathsqrt(dx * dx + dy * dy + dz * dz)
+    else
+        return mathsqrt(dx * dx + dy * dy)
+    end
+end
+
+local getloottype = function(name)
+    if name:sub(1, 1) == "C" then
+        return "Crate"
+    elseif name:sub(1, 1) == "S" then
+        return "Scrap"
+    elseif name:sub(1, 1) == "P" then
+        return "Gift"
+    end
+    return name
+end
+
+local setup_tools = function(model)
+    local meshpart = findfirstchild(model, "MeshPart")
+    if not meshpart then return end
+
+    local model_name = getname(model)
+    local cache_temp = {
+        root = meshpart,
+        name = getloottype(model_name),
+        text = draw('Text', {Text = '', Size = 12, Font = 5, Color = config.esp.tools.color, Center = true, Outline = true, Visible = false, Transparency = 1})
+    }
+
+    caches.tools[model] = cache_temp
+end
+
+local setup_dealers = function(model)
+    local mainpart = findfirstchild(model, "MainPart")
+    if not mainpart then return end
+
+    local cache_temp = {
+        root = mainpart,
+        name = "Armory",
+        text = draw('Text', {Text = '', Size = 12, Font = 5, Color = config.esp.dealers.color, Center = true, Outline = true, Visible = false, Transparency = 1})
+    }
+
+    caches.dealers[model] = cache_temp
+end
+
+local setup_breakables = function(model)
+    local mainpart = findfirstchild(model, "MainPart") 
+    if not mainpart then return end
+
+    local cache_temp = {
+        root = mainpart,
+        name = "Breakable",
+        text = draw('Text', {Text = '', Size = 12, Font = 5, Color = config.esp.breakables.color, Center = true, Outline = true, Visible = false, Transparency = 1})
+    }
+
+    caches.breakables[model] = cache_temp
+end
+
+local setup_atms = function(model)
+    local mainpart = findfirstchild(model, "MainPart")
+    if not mainpart then return end
+
+    local cache_temp = {
+        root = mainpart,
+        name = "ATM",
+        text = draw('Text', {Text = '', Size = 12, Font = 5, Color = config.esp.atms.color, Center = true, Outline = true, Visible = false, Transparency = 1})
+    }
+
+    caches.atms[model] = cache_temp
+end
+
+local threads = {}
+
+local load_caches = function()
+    local map_folder = folders.map
+    local filter_folder = folders.filter
+
+    while true do
+        if stop then
+            break
+        end
+
+        local spawned_piles = findfirstchild(filter_folder, "SpawnedPiles")
+        if spawned_piles then
+            for _, model in pairs(getchildren(spawned_piles)) do
+                if not caches.tools[model] and getclassname(model) == "Model" then
+                    setup_tools(model)
+                end
+            end
+        end
+
+        local shopz = findfirstchild(map_folder, "Shopz")
+        if shopz then
+            for _, model in pairs(getchildren(shopz)) do
+                if not caches.dealers[model] and getname(model) == "Dealer" then
+                    setup_dealers(model)
+                end
+            end
+        end
+
+        local bred_makurz = findfirstchild(map_folder, "BredMakurz")
+        if bred_makurz then
+            for _, model in pairs(getchildren(bred_makurz)) do
+                if not caches.breakables[model] and getclassname(model) == "Model" then
+                    setup_breakables(model)
+                end
+            end
+        end
+
+        local atmz = findfirstchild(map_folder, "ATMz")
+        if atmz then
+            for _, model in pairs(getchildren(atmz)) do
+                if not caches.atms[model] and getname(model) == "ATM" then
+                    setup_atms(model)
+                end
+            end
+        end
+
+        wait(1 / 30)
+        if stop then
+            break
+        end
+    end
+end
+
+local update_esp = function(cache_type, config_path)
+    local cache = caches[cache_type]
+
+    while true do
+        if stop then
+            for index, item in pairs(cache) do
+                if item.text then
+                    item.text:Remove()
+                end
+            end
+            break
+        end
+
+        local campos = getposition(camera)
+        for index, item in pairs(cache) do
+            local text = item.text
+            local root = item.root
+
+            if config_path.enabled and root and isdescendantof(root, workspace) then
+                local root_pos = getposition(root)
+                local root_vpp, root_os = worldtoscreenpoint({root_pos.x, root_pos.y, root_pos.z})
+                local distance_from_camera = mathfloor(getmagnitude(root_pos, campos))
+
+                if root_os and distance_from_camera <= config_path.max_distance then
+                    text.Text = config_path.draw_distance and item.name .. ' [' .. tostring(distance_from_camera) .. 'm]' or item.name
+                    text.Position = {root_vpp.x, root_vpp.y}
+                    text.Transparency = 1
+                    text.Visible = true
+                else
+                    text.Visible = false
+                end
+            else
+                if text then
+                    text.Visible = false
+                end
+            end
+        end
+
+        wait(1 / 240)
+        if stop then
+            break
+        end
+    end
+end
+
+local disconnect_scan = function() 
+    while wait(1 / 30) do
+        if stop then
+            break
+        end
+
+        if isrbxactive() then
+            local pressed = getpressedkeys()
+
+            local found = false
+            for _, value in pairs(pressed) do
+                if value == 'OEM_6' then 
+                    found = true
+                end
+            end
+
+            if found then
+                stop = true
+                break
+            end
+        end
+    end
+end
+
+local cleanup_drawings = function()
+
+    for cache_type, cache in pairs(caches) do
+        for index, item in pairs(cache) do
+            if item.text then
+                item.text:Remove()
+            end
+        end
+        caches[cache_type] = {}
+    end
+end
+
+local UI = nil  
+
+local isUnloading = false
+
+local unload_script = function()
+
+    if isUnloading then return end
+
+    isUnloading = true
+
+    stop = true
+
+    if config then
+        config.esp.tools.enabled = false
+        config.esp.dealers.enabled = false
+        config.esp.breakables.enabled = false
+        config.esp.atms.enabled = false
+    end
+
+    wait(0.2)
+
+    pcall(cleanup_drawings)
+
+    if UI and typeof(UI) == "table" then
+        pcall(function()
+
+            if typeof(UI.Unload) == "function" then
+                UI:Unload()
+            end
+
+            if typeof(UI.Tabs) == "table" then
+                for _, tab in pairs(UI.Tabs) do
+                    if tab and typeof(tab) == "table" then
+                        pcall(function()
+                            for _, element in pairs(tab) do
+                                if typeof(element) == "table" and typeof(element.Remove) == "function" then
+                                    element:Remove()
+                                end
+                            end
+                        end)
+                    end
+                end
+            end
+        end)
+    end
+
+    pcall(function()
+        if typeof(Drawing) == "table" and typeof(Drawing.clear) == "function" then
+            Drawing.clear()
+        end
+    end)
+
+    UI = nil
+    config = nil
+    caches = nil
+    folders = nil
+    threads = {}
+
+    pcall(function()
+        collectgarbage("collect")
+    end)
+
+    print("ESP Script unloaded successfully")
+
+    unload_script = function() end
+end
+
+UI = Library:Create({
+    Name = "Criminality ESP by anue"
+})
+
+local ESPTab = UI:Tab({
+    Name = "ESP"
+})
+
+local ESPTogglesSection = ESPTab:Section({
+    Name = "ESP Options",
+    Side = "Left"
+})
+
+local MasterESPToggle = ESPTogglesSection:Toggle({
+    Name = "Master ESP Toggle",
+    Default = true,
+    Callback = function(State)
+        config.esp.tools.enabled = State
+        config.esp.dealers.enabled = State
+        config.esp.breakables.enabled = State
+        config.esp.atms.enabled = State
+
+        ToolsToggle:Set(State)
+        DealersToggle:Set(State)
+        BreakablesToggle:Set(State)
+        ATMsToggle:Set(State)
+    end
+})
+
+local ToolsToggle = ESPTogglesSection:Toggle({
+    Name = "Tools ESP (Gifts/Crates/Scrap)",
+    Default = config.esp.tools.enabled,
+    Callback = function(State)
+        config.esp.tools.enabled = State
+    end
+})
+
+local DealersToggle = ESPTogglesSection:Toggle({
+    Name = "Dealers ESP",
+    Default = config.esp.dealers.enabled,
+    Callback = function(State)
+        config.esp.dealers.enabled = State
+    end
+})
+
+local BreakablesToggle = ESPTogglesSection:Toggle({
+    Name = "Breakables ESP",
+    Default = config.esp.breakables.enabled,
+    Callback = function(State)
+        config.esp.breakables.enabled = State
+    end
+})
+
+local ATMsToggle = ESPTogglesSection:Toggle({
+    Name = "ATMs ESP",
+    Default = config.esp.atms.enabled,
+    Callback = function(State)
+        config.esp.atms.enabled = State
+    end
+})
+
+local DistanceDisplayToggle = ESPTogglesSection:Toggle({
+    Name = "Show Distance",
+    Default = true,
+    Callback = function(State)
+        config.esp.tools.draw_distance = State
+        config.esp.dealers.draw_distance = State
+        config.esp.breakables.draw_distance = State
+        config.esp.atms.draw_distance = State
+    end
+})
+
+local ESPDistanceSection = ESPTab:Section({
+    Name = "ESP Distance",
+    Side = "Right"
+})
+
+local GlobalDistanceSlider = ESPDistanceSection:Slider({
+    Name = "Global ESP Distance",
+    Min = 100,
+    Max = 2000,
+    Default = 1000,
+    Increment = 100,
+    Units = "m",
+    Callback = function(Value)
+        config.esp.tools.max_distance = Value
+        config.esp.dealers.max_distance = Value
+        config.esp.breakables.max_distance = Value
+        config.esp.atms.max_distance = Value
+
+        ToolsDistanceSlider:Set(Value)
+        DealersDistanceSlider:Set(Value)
+        BreakablesDistanceSlider:Set(Value)
+        ATMsDistanceSlider:Set(Value)
+    end
+})
+
+local ToolsDistanceSlider = ESPDistanceSection:Slider({
+    Name = "Tools ESP Distance",
+    Min = 100,
+    Max = 2000,
+    Default = config.esp.tools.max_distance,
+    Increment = 100,
+    Units = "m",
+    Callback = function(Value)
+        config.esp.tools.max_distance = Value
+    end
+})
+
+local DealersDistanceSlider = ESPDistanceSection:Slider({
+    Name = "Dealers ESP Distance",
+    Min = 100,
+    Max = 2000,
+    Default = config.esp.dealers.max_distance,
+    Increment = 100,
+    Units = "m",
+    Callback = function(Value)
+        config.esp.dealers.max_distance = Value
+    end
+})
+
+local BreakablesDistanceSlider = ESPDistanceSection:Slider({
+    Name = "Breakables ESP Distance",
+    Min = 100,
+    Max = 2000,
+    Default = config.esp.breakables.max_distance,
+    Increment = 100,
+    Units = "m",
+    Callback = function(Value)
+        config.esp.breakables.max_distance = Value
+    end
+})
+
+local ATMsDistanceSlider = ESPDistanceSection:Slider({
+    Name = "ATMs ESP Distance",
+    Min = 100,
+    Max = 2000,
+    Default = config.esp.atms.max_distance,
+    Increment = 100,
+    Units = "m",
+    Callback = function(Value)
+        config.esp.atms.max_distance = Value
+    end
+})
+
+local SettingsTab = UI:Tab({
+    Name = "Settings"
+})
+
+local SettingsSection = SettingsTab:Section({
+    Name = "Script Settings",
+    Side = "Left"
+})
+
+local UnloadButton = SettingsSection:Button({
+    Name = "Unload Script",
+    Callback = function()
+
+        if isUnloading then return end
+
+        pcall(unload_script)
+
+        spawn(function()
+            wait(0.5)
+
+            pcall(function()
+                if Drawing and typeof(Drawing.clear) == "function" then
+                    Drawing.clear()
+                end
+            end)
+        end)
+    end
+})
+
+local InterfaceSection = SettingsTab:Section({
+    Name = "Interface Options",
+    Side = "Left"
+})
+
+local HotkeySection = SettingsTab:Section({
+    Name = "Hotkeys",
+    Side = "Right"
+})
+
+local HotkeyInfo = HotkeySection:Button({
+    Name = "Press 'P' to Open/Close UI",
+    Callback = function()
+
+    end
+})
+
+local CreditsSection = SettingsTab:Section({
+    Name = "Credits",
+    Side = "Right"
+})
+
+local CreditsInfo = CreditsSection:Button({
+    Name = "Made by anue",
+    Callback = function()
+
+    end
+})
+
+local CreditsInfo = CreditsSection:Button({
+    Name = "UI Made by king bob",
+    Callback = function()
+
+    end
+})
+
+local VersionSection = SettingsTab:Section({
+    Name = "Version",
+    Side = "Right"
+})
+
+local VersionInfo = VersionSection:Button({
+    Name = "Version 1.0.0",
+    Callback = function()
+
+    end
+})
+
+threads.load_caches = spawn(load_caches)
+threads.update_tools = spawn(function() update_esp("tools", config.esp.tools) end)
+threads.update_dealers = spawn(function() update_esp("dealers", config.esp.dealers) end)
+threads.update_breakables = spawn(function() update_esp("breakables", config.esp.breakables) end)
+threads.update_atms = spawn(function() update_esp("atms", config.esp.atms) end)
+threads.disconnect_scan = spawn(disconnect_scan)
+
+spawn(function()
+    while wait(1) do
+        if stop then
+            break
+        end
+    end
+end)
