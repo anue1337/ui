@@ -139,12 +139,19 @@ local setup_breakables = function(model)
     local mainpart = findfirstchild(model, "MainPart") 
     if not mainpart then return end
     
-    -- Obter o nome real do modelo em vez de usar o nome genérico "Breakable"
+
     local model_name = getname(model)
+    
+
+    local display_name = model_name
+    local underscore_pos = string.find(model_name, "_")
+    if underscore_pos then
+        display_name = string.sub(model_name, 1, underscore_pos - 1)
+    end
     
     local cache_temp = {
         root = mainpart,
-        name = model_name, -- Usar o nome real do modelo
+        name = display_name, -- Usar apenas a parte do nome antes do "_"
         text = draw('Text', {Text = '', Size = 12, Font = 5, Color = config.esp.breakables.color, Center = true, Outline = true, Visible = false, Transparency = 1})
     }
 
