@@ -1,0 +1,128 @@
+local players = findservice(Game, 'Players')
+local workspace = findservice(Game, 'Workspace')
+
+local characters_folder = findfirstchild(workspace, 'Characters')
+local localplayer = getlocalplayer()
+local localname = getname(localplayer)
+
+local cache = {}
+
+local function setup_entity(primary)
+
+    if getname(primary) == localname then
+        return
+    end
+
+    local playermodel = findfirstchild(primary, "Playermodel")
+    if not playermodel then 
+        return
+    end
+
+    local humanoid = findfirstchild(playermodel, "Humanoid")
+    if not humanoid then 
+        return
+    end
+
+    local rootpart = findfirstchild(playermodel, "HumanoidRootPart")
+    if not rootpart then 
+        return 
+    end
+
+    local head = findfirstchild(playermodel, "Head") or rootpart
+    local upperTorso = findfirstchild(playermodel, "UpperTorso") or rootpart
+    local lowerTorso = findfirstchild(playermodel, "LowerTorso") or rootpart
+
+    local temp = {
+        primary = primary,
+        class = "live",
+        _class = "human",
+        humanoid = humanoid,
+        rootpart = rootpart,
+        health = gethealth(humanoid)
+    }
+
+    local data = {
+        Username = getname(primary),
+        Displayname = getname(primary),
+        Userid = 0,
+        Character = primary,
+        PrimaryPart = rootpart,
+        Humanoid = humanoid,
+        Head = head,
+        Torso = upperTorso, 
+        UpperTorso = upperTorso,
+        LowerTorso = lowerTorso,
+        LeftArm = findfirstchild(playermodel, "LeftUpperArm") or rootpart, 
+        LeftLeg = findfirstchild(playermodel, "LeftUpperLeg") or rootpart, 
+        RightArm = findfirstchild(playermodel, "RightUpperArm") or rootpart, 
+        RightLeg = findfirstchild(playermodel, "RightUpperLeg") or rootpart, 
+        LeftUpperArm = findfirstchild(playermodel, "LeftUpperArm") or rootpart,
+        LeftLowerArm = findfirstchild(playermodel, "LeftLowerArm") or rootpart,
+        LeftHand = findfirstchild(playermodel, "LeftHand") or rootpart,
+        RightUpperArm = findfirstchild(playermodel, "RightUpperArm") or rootpart,
+        RightLowerArm = findfirstchild(playermodel, "RightLowerArm") or rootpart,
+        RightHand = findfirstchild(playermodel, "RightHand") or rootpart,
+        LeftUpperLeg = findfirstchild(playermodel, "LeftUpperLeg") or rootpart,
+        LeftLowerLeg = findfirstchild(playermodel, "LeftLowerLeg") or rootpart,
+        LeftFoot = findfirstchild(playermodel, "LeftFoot") or rootpart,
+        RightUpperLeg = findfirstchild(playermodel, "RightUpperLeg") or rootpart,
+        RightLowerLeg = findfirstchild(playermodel, "RightLowerLeg") or rootpart,
+        RightFoot = findfirstchild(playermodel, "RightFoot") or rootpart,
+        BodyHeightScale = 1,
+        RigType = 1, 
+        Whitelisted = false,
+        Archenemies = false,
+        Aimbot_Part = head, 
+        Aimbot_TP_Part = head,
+        Triggerbot_Part = head,
+        Health = gethealth(humanoid),
+        MaxHealth = getmaxhealth(humanoid)
+    }
+
+    add_model_data(data, tostring(primary))
+    cache[tostring(primary)] = temp
+end
+
+local function setup_cache()
+    while wait(1 / 30) do
+        if characters_folder then
+            for _, child in getchildren(characters_folder) do
+                if getname(child) ~= localname and not cache[tostring(child)] then
+                    setup_entity(child)
+                end
+            end
+        end
+    end
+end
+
+local function updater()
+    while wait(1 / 240) do
+        for index, entry in cache do
+            local primary = entry.primary
+            local rootpart = entry.rootpart
+            local humanoid = entry.humanoid
+
+            if rootpart and isdescendantof(primary, characters_folder) then
+                local data = {
+                    MaxHealth = getmaxhealth(humanoid)
+                }
+
+                local _health = gethealth(humanoid)
+                if _health ~= entry.health then
+                    data.Health = _health
+                    entry.health = _health
+                end
+
+                edit_model_data(data, index)
+            else
+
+                remove_model_data(index)
+                cache[index] = nil
+            end
+        end
+    end
+end
+
+clear_model_data()
+spawn(setup_cache)
+spawn(updater)
