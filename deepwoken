@@ -191,7 +191,7 @@ local function updater()
                 end
             elseif entry.class == 'chest' then
                 local rootpart = entry.rootpart
-                if not rootpart and not isdescendantof(entry.primary, thrown_folder) then
+                if not rootpart or not isdescendantof(rootpart, thrown_folder) then
                     remove_model_data(index)
                     cache[index] = nil
                     continue
@@ -201,5 +201,6 @@ local function updater()
     end
 end
 
+clear_model_data()
 spawn(setup_cache)
 spawn(updater)
