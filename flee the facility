@@ -1,114 +1,223 @@
-local workspace = getchildren(Game)[1]
-local espElements = {}
+local workspace = findservice(Game, 'Workspace')
+local players = findservice(Game, 'Players')
 local localPlayer = getlocalplayer()
 local localPlayerChar = getcharacter(localPlayer)
 local localHumanoidRootPart = findfirstchild(localPlayerChar, "HumanoidRootPart")
 
-local function getPosition(part)
-    return part and string.find(getclassname(part), "Part") and getposition(part) or nil
+local espElements = {}
+local mapCache = {}
+local computerCache = {}
+local lastUpdate = 0
+local updateInterval = 0.5 
+
+local ignoreModels = {
+    ["ProServersBoard"] = true,
+    ["VCServersBoard"] = true,
+    ["MapVotingBoard"] = true,
+    ["MerchBoard"] = true,
+    ["VipBoard"] = true
+}
+
+local playerNames = {}
+for _, player in pairs(getchildren(players)) do
+    playerNames[getname(player)] = true
 end
 
-local function ESP(color, textSize)
+local knownMaps = {
+    "Facility_0 by MrWindy",
+    "Abandoned Prison by AtomixKing & Duck_Ify",
+    "Homestead by MrWindy",
+    "Airport by deadlybones28",
+    "The Library by drainhp & CodedAbyss",
+    "Forgotten Facility by Kmart_Corp",
+    "Haunted Mansion by BreifAwesomeDude",
+    "Nuclear Power Plant by SonicUnkn0wn & Posyonose",
+    "School by Shortfingers",
+    "Abandoned Facility Optimus by SonicUnkn0wn & Kmart_Corp & VeryCoolSeal",
+    "Laboratory Complex by BlooIsHere",
+    "Sewer Treatment Plant by Jackz0_o",
+    "Arcade by D4niel_Foxy",
+}
+
+local function getPosition(part)
+    return part and getposition(part) or nil
+end
+
+local function createESP(color, textSize)
     local esp = {
         text = Drawing.new("Text"),
         distanceText = Drawing.new("Text"),
     }
-    for _, t in pairs({esp.text, esp.distanceText}) do
-        t.Size = textSize
-        t.Center = true
-        t.Outline = true
-    end
+
+    esp.text.Size = textSize
+    esp.text.Center = true
+    esp.text.Outline = true
     esp.text.Color = color
+    esp.text.Visible = false
+
+    esp.distanceText.Size = textSize
+    esp.distanceText.Center = true
+    esp.distanceText.Outline = true
     esp.distanceText.Color = color
+    esp.distanceText.Visible = false
+
     return esp
 end
 
-local function updateESP(part, esp, entityName)
+local function updateESP(part, esp, entityName, localPos3D)
     local pos3D = getPosition(part)
-    if pos3D then
-        local pos2D, onScreen = worldtoscreenpoint({pos3D.x, pos3D.y, pos3D.z})
-        if onScreen then
-            local localPos3D = getPosition(localHumanoidRootPart)
-            if localPos3D then
-                local distance = math.round(math.sqrt(
-                    (pos3D.x - localPos3D.x)^2 +
-                    (pos3D.y - localPos3D.y)^2 +
-                    (pos3D.z - localPos3D.z)^2
-                ))
-
-                esp.text.Position = {pos2D.x, pos2D.y - 15}
-                esp.text.Text = entityName
-                esp.text.Visible = true
-
-                esp.distanceText.Position = {pos2D.x, pos2D.y + 15}
-                esp.distanceText.Text = string.format("D: %d", distance)
-                esp.distanceText.Visible = true
-            end
-        else
-            esp.text.Visible = false
-            esp.distanceText.Visible = false
-        end
-    else
+    if not pos3D then
         esp.text.Visible = false
         esp.distanceText.Visible = false
+        return
+    end
+
+    local pos2D, onScreen = worldtoscreenpoint({pos3D.x, pos3D.y, pos3D.z})
+    if not onScreen then
+        esp.text.Visible = false
+        esp.distanceText.Visible = false
+        return
+    end
+
+    local dx, dy, dz = pos3D.x - localPos3D.x, pos3D.y - localPos3D.y, pos3D.z - localPos3D.z
+    local distance = math.round(math.sqrt(dx*dx + dy*dy + dz*dz))
+
+    esp.text.Position = {pos2D.x, pos2D.y - 15}
+    esp.text.Text = entityName
+    esp.text.Visible = true
+
+    esp.distanceText.Position = {pos2D.x, pos2D.y + 15}
+    esp.distanceText.Text = "D: " .. distance
+    esp.distanceText.Visible = true
+end
+
+local function isMapModel(model)
+    local modelName = getname(model)
+
+    if string.find(modelName, "by") then
+
+        if not ignoreModels[modelName] and not playerNames[modelName] then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function findComputerTables(mapModel)
+    if not mapModel then return {} end
+
+    local mapId = tostring(mapModel)
+    if computerCache[mapId] then
+        return computerCache[mapId]
+    end
+
+    local computers = {}
+    for _, model in pairs(getchildren(mapModel)) do
+        if getclassname(model) == "Model" and getname(model) == "ComputerTable" then
+            local representativePart = nil
+
+            for _, part in pairs(getchildren(model)) do
+                if getclassname(part) == "Part" then
+                    representativePart = part
+                    break
+                end
+            end
+
+            if representativePart then
+                computers[tostring(model)] = {
+                    model = model,
+                    part = representativePart
+                }
+            end
+        end
+    end
+
+    computerCache[mapId] = computers
+    return computers
+end
+
+local function findMaps()
+    local time = tick()
+    if time - lastUpdate < updateInterval then
+        return mapCache
+    end
+
+    lastUpdate = time
+    local foundMaps = {}
+
+    for _, mapName in ipairs(knownMaps) do
+        local map = findfirstchild(workspace, mapName)
+        if map then
+            foundMaps[mapName] = map
+        end
+    end
+
+    if not next(foundMaps) then
+        for _, model in pairs(getchildren(workspace)) do
+            if getclassname(model) == "Model" and isMapModel(model) then
+                local modelName = getname(model)
+                foundMaps[modelName] = model
+            end
+        end
+    end
+
+    mapCache = foundMaps
+    return foundMaps
+end
+
+local function renderESP()
+    local localPos3D = getPosition(localHumanoidRootPart)
+    if not localPos3D then return end
+
+    local activeParts = {}
+    local maps = findMaps()
+
+    for mapName, mapModel in pairs(maps) do
+        local computers = findComputerTables(mapModel)
+
+        for computerId, computerData in pairs(computers) do
+            activeParts[computerId] = true
+
+            if not espElements[computerId] then
+                espElements[computerId] = createESP({255, 215, 0}, 12)
+            end
+
+            updateESP(computerData.part, espElements[computerId], getname(computerData.model), localPos3D)
+        end
+    end
+
+    for entityId, esp in pairs(espElements) do
+        if not activeParts[entityId] then
+            esp.text:Remove()
+            esp.distanceText:Remove()
+            espElements[entityId] = nil
+        end
+    end
+end
+
+local function cleanupCache()
+    while wait(30) do  
+        local mapsToKeep = {}
+        local currentMaps = findMaps()
+
+        for mapId in pairs(computerCache) do
+            if not currentMaps[mapId] then
+                computerCache[mapId] = nil
+            else
+                mapsToKeep[mapId] = true
+            end
+        end
+
+        lastUpdate = 0
     end
 end
 
 spawn(function()
     while true do
-        local currentParts = {}
-        local localPos3D = getPosition(localHumanoidRootPart)
-        if localPos3D then
-            
-            local modelsToCheck = {
-                "Facility_0 by MrWindy",
-                "Abandoned Prison by AtomixKing & Duck_Ify",
-                "Homestead by MrWindy",
-                "Airport by deadlybones28",
-                "The Library by drainhp & CodedAbyss",
-                "Forgotten Facility by Kmart_Corp",
-                "Haunted Mansion by BreifAwesomeDude",
-                "Nuclear Power Plant by SonicUnkn0wn & Posyonose",
-                "School by Shortfingers",
-                "Abandoned Facility Optimus by SonicUnkn0wn & Kmart_Corp & VeryCoolSeal",
-                "Laboratory Complex by BlooIsHere",
-                "Sewer Treatment Plant by Jackz0_o",
-                "Arcade by D4niel_Foxy",
-            }
-
-            for _, modelName in ipairs(modelsToCheck) do
-                
-                local facilityModel = findfirstchild(workspace, modelName)
-                if facilityModel then
-                    
-                    for _, computerTableModel in pairs(getchildren(facilityModel)) do
-                        if getclassname(computerTableModel) == "Model" and getname(computerTableModel) == "ComputerTable" then
-                            
-                            local renderedPart = false
-                            for _, part in pairs(getchildren(computerTableModel)) do
-                                if getclassname(part) == "Part" and not renderedPart then
-                                    currentParts[computerTableModel] = true
-                                    if not espElements[computerTableModel] then
-                                        espElements[computerTableModel] = ESP({255, 215, 0}, 12) 
-                                    end
-                                    updateESP(part, espElements[computerTableModel], getname(computerTableModel))
-                                    renderedPart = true 
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-
-            
-            for entityModel in pairs(espElements) do
-                if not currentParts[entityModel] then
-                    espElements[entityModel].text:Remove()
-                    espElements[entityModel].distanceText:Remove()
-                    espElements[entityModel] = nil
-                end
-            end
-        end
-        wait(0.001)
+        renderESP()
+        wait(0.01)  
     end
 end)
+
+spawn(cleanupCache)
