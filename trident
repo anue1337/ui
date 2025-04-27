@@ -1,0 +1,195 @@
+local Workspace = findfirstchildofclass(Game, "Workspace")
+local LocalPlayer = nil 
+local TrackedModels = {}
+
+local function IsValidModel(Model)
+    local Head = findfirstchild(Model, "Head")
+    local HumanoidRootPart = findfirstchild(Model, "HumanoidRootPart")
+    local Torso = findfirstchild(Model, "Torso") or findfirstchild(Model, "LowerTorso")
+
+    return Head ~= nil and HumanoidRootPart ~= nil
+end
+
+local function FindLocalPlayer()
+    if LocalPlayer and IsValidModel(LocalPlayer) then
+        return 
+    end
+
+    local Models = getchildren(Workspace)
+    for _, Model in ipairs(Models) do
+        if getname(Model) == "Model" and IsValidModel(Model) then
+
+            LocalPlayer = Model
+            break
+        end
+    end
+end
+
+
+
+local function TeamCheck(Entity)
+    return false
+end
+
+local function GetBodyParts(Model)
+
+    return {
+        Head = findfirstchild(Model, "Head"),
+        LeftArm = findfirstchild(Model, "LeftUpperArm") or findfirstchild(Model, "LeftLowerArm"),
+        RightArm = findfirstchild(Model, "RightUpperArm") or findfirstchild(Model, "RightLowerArm"),
+        RightLeg = findfirstchild(Model, "RightUpperLeg") or findfirstchild(Model, "RightLowerLeg"),
+        LeftLeg = findfirstchild(Model, "LeftUpperLeg") or findfirstchild(Model, "LeftLowerLeg"),
+        Torso = findfirstchild(Model, "Torso") or findfirstchild(Model, "LowerTorso"),
+        HumanoidRootPart = findfirstchild(Model, "HumanoidRootPart")
+    }
+end
+
+local function PlayerData(Model, Parts)
+    local headPart = Parts.Head
+    local torsoPart = Parts.Torso
+    local rootPart = Parts.HumanoidRootPart
+    local leftLegPart = Parts.LeftLeg
+    local rightLegPart = Parts.RightLeg
+    local leftArmPart = Parts.LeftArm
+    local rightArmPart = Parts.RightArm
+
+    if not headPart or not torsoPart or not rootPart then
+        return nil, nil 
+    end
+
+    leftLegPart = leftLegPart or rootPart
+    rightLegPart = rightLegPart or rootPart
+    leftArmPart = leftArmPart or rootPart
+    rightArmPart = rightArmPart or rootPart
+
+    local Data = {
+        Username = tostring(Model),
+        Displayname = "Player",
+        Userid = 0,
+        Character = Model,
+        PrimaryPart = headPart,
+        Humanoid = headPart, 
+
+        Head = headPart,
+        Torso = torsoPart,
+        HumanoidRootPart = rootPart,
+        LeftArm = leftArmPart, 
+        LeftLeg = leftLegPart, 
+        RightArm = rightArmPart, 
+        RightLeg = rightLegPart, 
+        BodyHeightScale = 1,
+        RigType = 0,
+        Whitelisted = false,
+        Archenemies = false,
+        Aimbot_Part = headPart,
+        Aimbot_TP_Part = headPart,
+        Triggerbot_Part = headPart,
+        Health = 100,
+        MaxHealth = 100,
+    }
+
+    return tostring(Model), Data
+end
+
+local function Update()
+
+    if not LocalPlayer then
+        FindLocalPlayer()
+    end
+
+    local Models = getchildren(Workspace)
+    local Seen = {}
+
+    for _, Obj in ipairs(Models) do
+        if getname(Obj) == "Model" and Obj ~= LocalPlayer and IsValidModel(Obj) then
+            local Key = tostring(Obj)
+            local Parts = GetBodyParts(Obj)
+
+
+            local Key = tostring(Obj)
+            if not TrackedModels[Key] then
+                local ID, Data = PlayerData(Obj, Parts)
+                if ID and Data and add_model_data(Data, ID) then
+                    print("Added model: " .. ID) 
+                    TrackedModels[ID] = Obj
+                end
+            end
+            Seen[Key] = true
+        end
+    end
+
+    for Key, Model in pairs(TrackedModels) do
+        if not Seen[Key] then
+            print("Model removed: " .. Key) 
+            remove_model_data(Key)
+            TrackedModels[Key] = nil
+        end
+    end
+end
+
+local function LocalPlayerData()
+    if not LocalPlayer then
+        FindLocalPlayer()
+        if not LocalPlayer then return end
+    end
+
+    local Parts = GetBodyParts(LocalPlayer)
+
+    if not Parts.Head or not Parts.HumanoidRootPart or not Parts.Torso then
+        return
+    end
+
+    local leftLegPart = Parts.LeftLeg or Parts.HumanoidRootPart
+    local rightLegPart = Parts.RightLeg or Parts.HumanoidRootPart
+    local leftArmPart = Parts.LeftArm or Parts.HumanoidRootPart
+    local rightArmPart = Parts.RightArm or Parts.HumanoidRootPart
+
+    local LocalData = {
+        LocalPlayer = LocalPlayer,
+        Character = LocalPlayer,
+        Username = "LocalPlayer",
+        Displayname = "LocalPlayer",
+        Userid = 300,
+        Team = nil,
+        Tool = nil,
+        Humanoid = Parts.HumanoidRootPart,
+        Health = 100,
+        MaxHealth = 100,
+        RigType = 0,
+
+        Head = Parts.Head,
+        RootPart = Parts.HumanoidRootPart,
+        LeftFoot = leftLegPart,
+        LowerTorso = Parts.Torso,
+
+        LeftArm = leftArmPart,
+        LeftLeg = leftLegPart,
+        RightArm = rightArmPart,
+        RightLeg = rightLegPart,
+        UpperTorso = Parts.Torso,
+    }
+
+    print("Applying local data")
+
+    override_local_data(LocalData)
+end
+
+spawn(function()
+    FindLocalPlayer()
+    LocalPlayerData()
+end)
+
+spawn(function()
+    print("Starting main loop") 
+    while true do
+        wait(0.2)
+        Update()
+    end
+end)
+
+spawn(function()
+    while true do
+        wait(1)
+        LocalPlayerData()
+    end
+end)
