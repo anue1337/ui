@@ -1,0 +1,203 @@
+local Workspace = findfirstchildofclass(Game, "Workspace")
+local Players = findfirstchild(Workspace, "Players") 
+local TrackedModels = {}
+local LocalPlayer = nil
+
+local function FindLocalPlayer()
+    local GamePlayers = findfirstchildofclass(Game, "Players") 
+    if not GamePlayers then return nil end
+
+    local AllPlayers = getchildren(GamePlayers)
+    local LocalPlayerRef = nil
+
+    for _, Player in ipairs(AllPlayers) do
+        local PlayerGui = findfirstchild(Player, "PlayerGui")
+        if PlayerGui then
+            LocalPlayerRef = Player
+            break
+        end
+    end
+
+    if not LocalPlayerRef then return nil end
+
+    local playerName = nil
+    local success, result = pcall(function() return getname(LocalPlayerRef) end)
+    if success and result then playerName = result end
+
+    if playerName then
+        for _, model in ipairs(getchildren(Players)) do
+            local modelName = nil
+            success, modelName = pcall(function() return getname(model) end)
+
+            if success and modelName and modelName == playerName then
+                return model
+            end
+        end
+    end
+
+    return nil
+end
+
+local function TeamCheck(Entity)
+    if not LocalPlayer then return false end
+
+    local Head = findfirstchild(Entity, "Head")
+    local LocalPlayerHead = findfirstchild(LocalPlayer, "Head")
+
+    if getclassname(Head) == getclassname(LocalPlayerHead) then
+        return true
+    else
+        return false
+    end
+end
+
+local function GetBodyParts(Model)
+    return {
+        Head = findfirstchild(Model, "Head"),
+        LeftArm = findfirstchild(Model, "LeftUpperArm"),
+        RightArm = findfirstchild(Model, "RightUpperArm"),
+        RightLeg = findfirstchild(Model, "RightUpperLeg"),
+        LeftLeg = findfirstchild(Model, "LeftUpperLeg"),
+        Torso = findfirstchild(Model, "UpperTorso"),
+        HumanoidRootPart = findfirstchild(Model, "HumanoidRootPart")
+    }
+end
+
+local function PlayerData(Model, Parts)
+    local Data = {
+        Username = tostring(Model), 
+        Displayname = tostring(Model), 
+        Userid = 0,
+        Character = Model,
+        PrimaryPart = Parts.Head,
+        Humanoid = Parts.Head,
+        Head = Parts.Head,
+        Torso = Parts.Torso,
+        LeftArm = Parts.LeftArm, 
+        LeftLeg = Parts.LeftLeg, 
+        RightArm = Parts.RightArm, 
+        RightLeg = Parts.RightLeg, 
+        BodyHeightScale = 1,
+        RigType = 0,
+        Whitelisted = false,
+        Archenemies = false,
+        Aimbot_Part = Parts.Head,
+        Aimbot_TP_Part = Parts.Head,
+        Triggerbot_Part = Parts.Head,
+        Health = 100,
+        MaxHealth = 100,
+    }
+
+    return tostring(Model), Data
+end
+
+local function IsLocalPlayer(Model)
+    if not LocalPlayer then return false end
+    return Model == LocalPlayer
+end
+
+local function Update()
+
+    if not LocalPlayer then
+        LocalPlayer = FindLocalPlayer()
+    end
+
+    local localPlayerName = nil
+    if LocalPlayer then
+        pcall(function() localPlayerName = getname(LocalPlayer) end)
+    end
+
+    local PlayerModels = getchildren(Players)
+    local Seen = {}
+
+    for _, Obj in ipairs(PlayerModels) do
+        local objName = nil
+        pcall(function() objName = getname(Obj) end)
+
+        local isLocal = (Obj == LocalPlayer)
+        if localPlayerName and objName and objName == localPlayerName then
+            isLocal = true
+        end
+
+        if not isLocal then 
+            local Key = tostring(Obj)
+            local Parts = GetBodyParts(Obj)
+
+            if Parts.Head and Parts.HumanoidRootPart then
+                if not TrackedModels[Key] then
+                    local ID, Data = PlayerData(Obj, Parts)
+                    if add_model_data(Data, ID) then
+                        TrackedModels[ID] = Obj
+                    end
+                end
+                Seen[Key] = true
+            end
+        end
+    end
+
+    for Key, Model in pairs(TrackedModels) do
+        local HumanoidRootPart = findfirstchild(Model, "HumanoidRootPart")
+        if not HumanoidRootPart or not Seen[Key] then
+            remove_model_data(Key)
+            TrackedModels[Key] = nil
+        end
+    end
+end
+
+local function LocalPlayerData()
+    if not LocalPlayer then 
+        LocalPlayer = FindLocalPlayer()
+        if not LocalPlayer then return end
+    end
+
+    local LocalData = {
+        LocalPlayer = LocalPlayer,
+        Character = LocalPlayer,
+        Username = tostring(LocalPlayer), 
+        Displayname = tostring(LocalPlayer), 
+        Userid = 300,
+        Team = nil,
+        Tool = nil,
+        Humanoid = findfirstchild(LocalPlayer, "Humanoid"),
+        Health = 100,
+        MaxHealth = 100,
+        RigType = 0,
+
+        Head = findfirstchild(LocalPlayer, "Head"),
+        RootPart = findfirstchild(LocalPlayer, "HumanoidRootPart"),
+        LeftFoot = findfirstchild(LocalPlayer, "LeftFoot"),
+        LowerTorso = findfirstchild(LocalPlayer, "LowerTorso"),
+
+        LeftArm = findfirstchild(LocalPlayer, "LeftUpperArm"),
+        LeftLeg = findfirstchild(LocalPlayer, "LeftUpperLeg"),
+        RightArm = findfirstchild(LocalPlayer, "RightUpperArm"),
+        RightLeg = findfirstchild(LocalPlayer, "RightUpperLeg"),
+        UpperTorso = findfirstchild(LocalPlayer, "UpperTorso"),
+    }
+
+    override_local_data(LocalData)
+end
+
+spawn(function()
+    LocalPlayer = FindLocalPlayer()
+
+    if LocalPlayer then
+
+        local localKey = tostring(LocalPlayer)
+        if TrackedModels[localKey] then
+            remove_model_data(localKey)
+            TrackedModels[localKey] = nil
+        end
+    end
+
+    LocalPlayerData()
+
+    Update()
+end)
+
+spawn(function()
+    while true do
+        wait(0.2)
+        Update()
+    end
+end)
