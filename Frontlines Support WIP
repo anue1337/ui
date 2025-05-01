@@ -1,0 +1,221 @@
+local Workspace = findfirstchildofclass(Game, "Workspace")
+local TrackedModels = {}
+
+local function FindLocalPlayerModel()
+
+    local AllModels = getchildren(Workspace)
+    for _, model in ipairs(AllModels) do
+        if getname(model) == "soldier_model" then
+
+            return model
+        end
+    end
+    return nil
+end
+
+local LocalPlayer = FindLocalPlayerModel()
+
+local function TeamCheck(Entity)
+    if not LocalPlayer then return false end
+
+    if findfirstchild(Entity, "friendly_marker") then
+        return true 
+    end
+
+    if Entity == LocalPlayer then return true end
+
+    return false 
+end
+
+local function GetBodyParts(Model)
+
+    local StarterCharacter = findfirstchild(Model, "StarterCharacter")
+    local HumanoidRootPart
+    local Humanoid
+
+    if StarterCharacter then
+
+        HumanoidRootPart = findfirstchild(StarterCharacter, "HumanoidRootPart")
+        Humanoid = findfirstchild(StarterCharacter, "Humanoid")
+    else
+
+        HumanoidRootPart = findfirstchild(Model, "HumanoidRootPart")
+    end
+
+    return {
+        Head = HumanoidRootPart,
+        LeftArm = HumanoidRootPart,
+        RightArm = HumanoidRootPart,
+        RightLeg = HumanoidRootPart,
+        LeftLeg = HumanoidRootPart,
+        Torso = HumanoidRootPart,
+        HumanoidRootPart = HumanoidRootPart,
+        Humanoid = Humanoid,
+        StarterCharacter = StarterCharacter
+    }
+end
+
+local function GetHealth(Model, Parts)
+    if Parts.Humanoid then
+        return Parts.Humanoid.Health, Parts.Humanoid.MaxHealth
+    end
+    return 100, 100  
+end
+
+local function PlayerData(Model, Parts)
+
+    if not Parts.HumanoidRootPart then
+        return nil, nil  
+    end
+
+    local Health, MaxHealth = GetHealth(Model, Parts)
+
+    local Data = {
+        Username = tostring(Model),
+        Displayname = "Soldier",
+        Userid = 0,
+        Character = Model,
+        PrimaryPart = Parts.HumanoidRootPart,
+        Humanoid = Parts.Humanoid or Parts.HumanoidRootPart, 
+        Head = Parts.HumanoidRootPart,
+        Torso = Parts.HumanoidRootPart,
+        LeftArm = Parts.HumanoidRootPart, 
+        LeftLeg = Parts.HumanoidRootPart,
+        RightArm = Parts.HumanoidRootPart,
+        RightLeg = Parts.HumanoidRootPart,
+        BodyHeightScale = 1,
+        RigType = 0,
+        Whitelisted = false,
+        Archenemies = false,
+        Aimbot_Part = Parts.HumanoidRootPart,
+        Aimbot_TP_Part = Parts.HumanoidRootPart,
+        Triggerbot_Part = Parts.HumanoidRootPart,
+        Health = Health,
+        MaxHealth = MaxHealth,
+        StarterCharacter = Parts.StarterCharacter
+    }
+
+    return tostring(Model), Data
+end
+
+local function Update()
+    local AllModels = getchildren(Workspace)
+    local Seen = {}
+
+    for _, Obj in ipairs(AllModels) do
+        if getname(Obj) == "soldier_model" and Obj ~= LocalPlayer then
+            local Key = tostring(Obj)
+            local Parts = GetBodyParts(Obj)
+
+            if Parts.HumanoidRootPart and not TeamCheck(Obj) then
+                if not TrackedModels[Key] then
+                    local ID, Data = PlayerData(Obj, Parts)
+                    if ID and add_model_data(Data, ID) then
+                        TrackedModels[ID] = Obj
+                    end
+                end
+                Seen[Key] = true
+
+                if TrackedModels[Key] and Parts.Humanoid then
+                    local health = Parts.Humanoid.Health
+                    local maxHealth = Parts.Humanoid.MaxHealth
+                    update_health_data(Key, health, maxHealth)
+                end
+            end
+        end
+    end
+
+    for Key, Model in pairs(TrackedModels) do
+        local StarterCharacter = findfirstchild(Model, "StarterCharacter")
+        local HumanoidRootPart 
+
+        if StarterCharacter then
+            HumanoidRootPart = findfirstchild(StarterCharacter, "HumanoidRootPart")
+        else
+            HumanoidRootPart = findfirstchild(Model, "HumanoidRootPart")
+        end
+
+        if not HumanoidRootPart or not Seen[Key] then
+            remove_model_data(Key)
+            TrackedModels[Key] = nil
+        end
+    end
+end
+
+local function LocalPlayerData()
+    if not LocalPlayer then return end
+
+    local Parts = GetBodyParts(LocalPlayer)
+
+    if not Parts.HumanoidRootPart then return end
+
+    local Health, MaxHealth = GetHealth(LocalPlayer, Parts)
+
+    local LocalData = {
+        LocalPlayer = LocalPlayer,
+        Character = LocalPlayer,
+        Username = "Player",
+        Displayname = "Player",
+        Userid = 300,
+        Team = nil,
+        Tool = nil,
+        Humanoid = Parts.Humanoid or Parts.HumanoidRootPart,
+        Health = Health,
+        MaxHealth = MaxHealth,
+        RigType = 0,
+
+        Head = Parts.HumanoidRootPart,
+        RootPart = Parts.HumanoidRootPart,
+        LeftFoot = Parts.HumanoidRootPart,
+        LowerTorso = Parts.HumanoidRootPart,
+
+        LeftArm = Parts.HumanoidRootPart,
+        LeftLeg = Parts.HumanoidRootPart,
+        RightArm = Parts.HumanoidRootPart,
+        RightLeg = Parts.HumanoidRootPart,
+        UpperTorso = Parts.HumanoidRootPart,
+        StarterCharacter = Parts.StarterCharacter
+    }
+
+    override_local_data(LocalData)
+end
+
+local function MonitorHealthChanges()
+    while true do
+        wait(0.1)  
+
+        for Key, Model in pairs(TrackedModels) do
+            local StarterCharacter = findfirstchild(Model, "StarterCharacter")
+            if StarterCharacter then
+                local Humanoid = findfirstchild(StarterCharacter, "Humanoid")
+                if Humanoid then
+                    update_health_data(Key, Humanoid.Health, Humanoid.MaxHealth)
+                end
+            end
+        end
+
+        if LocalPlayer then
+            local StarterCharacter = findfirstchild(LocalPlayer, "StarterCharacter")
+            if StarterCharacter then
+                local Humanoid = findfirstchild(StarterCharacter, "Humanoid")
+                if Humanoid then
+                    local LocalData = {
+                        Health = Humanoid.Health,
+                        MaxHealth = Humanoid.MaxHealth
+                    }
+                    update_local_health(LocalData)
+                end
+            end
+        end
+    end
+end
+
+spawn(function()
+    while true do
+        wait(0.2)
+        Update()
+    end
+end)
+
+spawn(LocalPlayerData)
+spawn(MonitorHealthChanges)  
