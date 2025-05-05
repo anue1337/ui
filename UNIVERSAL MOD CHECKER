@@ -1,27 +1,131 @@
-local mods_user_ids = {1, 2, 3}
+local SETTINGS = {
+    mods = {
+        manual = false,                             -- if false then automatic parsing from group, if true then use user_ids from table user_ids
+        group_id = 0,                               -- group id from which userids will be parsed
+        user_ids = {}                               -- userids (if using manual)
+    },
+    ui = {
+        keybind = "OEM_4",                          -- keybind to show / hide the ui
+        draggable = true,                           -- is ui draggable or not
+        position = "top",                           -- "top", "right bottom", "left bottom"
+        transparency = 1,                           -- ui transparency, 0 - 1
+        dimensions = {width = 280, height = 140},   -- ui size
+        custom_notification = true                  -- set to false or nil for severes one
+    },
+    text = {
+        transparency = 1,                           -- text transparency, 0 - 1
+        size = 15,                                  -- text size (not tested)
+        base_offset = 7,                            -- offset of text with each mod
+        font = 4                                    -- font for text
+    }
+}
 
--- text settings
-local text_transparency = 1    -- 0 - 1
-local text_size = 15           -- text size
-local base_offset = 7          -- offset up with every mod
-local font = 4                 -- font, 10 for better readability, 4 fits better
+local cache = {}
+local in_game_mods = {}
+local SCREEN_DIMENSIONS, MOUSE_SERVICE = getscreendimensions(), findservice(Game, "MouseService")
+local active_notifications, notifications = 0, {}
+local cnotification=function(text,time)spawn(function()local this_notification={frames={Drawing.new("Square"),Drawing.new("Square"),Drawing.new("Square")},text=Drawing.new("Text"),target_y=60+(#notifications*30),current_y=60+(#notifications*30),valid=true,current_x=10}active_notifications=active_notifications+1 local notification_index=#notifications+1 notifications[notification_index]=this_notification for i=1,3 do this_notification.frames[i].Filled=true this_notification.frames[i].Visible=true this_notification.frames[i].Transparency=1 this_notification.frames[i].Size={0,i==1 and 20 or 0} end this_notification.frames[1].Color={20,20,20}this_notification.frames[2].Color={215,215,215}this_notification.frames[3].Color={20,20,20}this_notification.text.Visible=true this_notification.text.Center=false this_notification.text.Color={255,255,255}this_notification.text.Size=14 this_notification.text.Font=1 this_notification.text.Text=text local text_width=this_notification.text.TextBounds.x local frame_width=text_width+30 for x=-100,10,5 do if not this_notification.valid then break end this_notification.current_x=x this_notification.frames[1].Size={frame_width,20}this_notification.frames[2].Size={frame_width-2.25,17.5}this_notification.frames[3].Size={frame_width-5.5,13.5}this_notification.frames[1].Position={x,this_notification.current_y}this_notification.frames[2].Position={x+1.25,this_notification.current_y+1.25}this_notification.frames[3].Position={x+2.75,this_notification.current_y+3.25}this_notification.text.Position={x+15,this_notification.current_y+3.75}wait()end wait(time)for step=1,20 do if not this_notification.valid then break end local progress=step/20 local new_x=10-(frame_width+20)*progress this_notification.frames[1].Position={new_x,this_notification.current_y}this_notification.frames[2].Position={new_x+1.25,this_notification.current_y+1.25}this_notification.frames[3].Position={new_x+2.75,this_notification.current_y+3.25}this_notification.text.Position={new_x+15,this_notification.current_y+3.75}wait()end if this_notification.valid then for i=1,3 do this_notification.frames[i]:Remove()end this_notification.text:Remove()this_notification.valid=false active_notifications=active_notifications-1 end for i=#notifications,1,-1 do if not notifications[i].valid then table.remove(notifications,i)end end for index,notification in notifications do if notification.valid then notification.target_y=60+((index-1)*30)notification.current_y=notification.target_y local current_x=notification.current_x notification.frames[1].Position={current_x,notification.current_y}notification.frames[2].Position={current_x+1.25,notification.current_y+1.25}notification.frames[3].Position={current_x+2.75,notification.current_y+3.25}notification.text.Position={current_x+15,notification.current_y+3.75}end end end)end
+local notification = function(text, time)
+    if SETTINGS.ui.custom_notification then
+        cnotification(text, time)
+    else
+        sendnotification(text, "warning")
+    end
+end
 
--- ui settings
-local ui_position = "top"      -- "top", "left bottom", "right bottom"
-local ui_transparency = 1      -- 0 - 1
+if not manual and SETTINGS.mods.group_id == nil or SETTINGS.mods.group_id == 0 then
+    notification("universal mod checker | please provide it in settings and rerun the script", 5)
+    notification("universal mod checker | you set automatic mod parsing, but did not provide a group id", 5)
+    return
+end
 
--- code
-local SCREEN_DIMENSIONS = getscreendimensions()
+local get_mods = function(group_id)
+    local user_ids, role_ids = {}, {}
+    local roles = game:HttpGet("https://groups.roblox.com/v1/groups/"..group_id.."/roles")
+    if roles then
+        local decoded = JSONDecode(roles)
+        if decoded and decoded.roles then
+            for index, role in decoded.roles do
+                if role.id and role.name and role.memberCount then
+                    if role.memberCount <= 100 and role.name ~= "Member" then
+                        table.insert(role_ids, role.id)
+                    end
+                end
+            end
+            if #role_ids > 0 then
+                for index, role_id in role_ids do
+                    local users = game:HttpGet("https://groups.roblox.com/v1/groups/"..group_id.."/roles/"..role_id.."/users?limit=100&sortOrder=Asc")
+                    if users then
+                        local decoded = JSONDecode(users)
+                        if decoded and decoded.data then
+                            for index, user in decoded.data do
+                                if user.userId then
+                                    table.insert(user_ids, tonumber(user.userId))
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    print(table.concat(user_ids, ", "))
+    if #user_ids > 0 then
+        return user_ids
+    end
+end
+
+local ensure_cache = function(userdata)
+    if not cache[userdata] then
+        cache[userdata] = {}
+    end
+end
+
+local clear_cache = function(userdata)
+    cache[userdata] = nil
+end
+
+local cached_getdisplayname = function(userdata)
+    ensure_cache(userdata)
+    if not cache[userdata].display_name then
+        cache[userdata].display_name = getdisplayname(userdata)
+    end
+    return cache[userdata].display_name
+end
+
+local cached_getuserid = function(userdata)
+    ensure_cache(userdata)
+    if not cache[userdata].user_id then
+        cache[userdata].user_id = getuserid(userdata)
+    end
+    return cache[userdata].user_id
+end
+
+if not SETTINGS.mods.manual then
+    while true do
+        local result = get_mods(SETTINGS.mods.group_id)
+        if result then
+            SETTINGS.mods.user_ids = result
+            notification("universal mod checker | successfully parsed "..#result.." mods", 5)
+            break
+        else
+            notification("universal mod checker | failed parsing mods from group, retrying in 5 seconds", 5)
+        end
+    end
+end
+
 local FRAME_0 = Drawing.new("Square")
 FRAME_0.Filled = true
 FRAME_0.Visible = true
-FRAME_0.Size = {280, 140}
+FRAME_0.Size = {SETTINGS.ui.dimensions.width, SETTINGS.ui.dimensions.height}
+FRAME_0.Color = {20, 20, 20}
+FRAME_0.Transparency = SETTINGS.ui.transparency
 
-if ui_position == "top" then
+if SETTINGS.ui.position == "top" then
     FRAME_0.Position = {SCREEN_DIMENSIONS.x / 2 - FRAME_0.Size.x / 2, 20}
-elseif ui_position == "left bottom" then
+elseif SETTINGS.ui.position == "left bottom" then
     FRAME_0.Position = {20, SCREEN_DIMENSIONS.y - FRAME_0.Size.y - 20}
-elseif ui_position == "right bottom" then
+elseif SETTINGS.ui.position == "right bottom" then
     FRAME_0.Position = {
         SCREEN_DIMENSIONS.x - FRAME_0.Size.x - 20,
         SCREEN_DIMENSIONS.y - FRAME_0.Size.y - 20
@@ -29,8 +133,6 @@ elseif ui_position == "right bottom" then
 else
     FRAME_0.Position = {20, SCREEN_DIMENSIONS.y - FRAME_0.Size.y - 20}
 end
-FRAME_0.Color = {20, 20, 20}
-FRAME_0.Transparency = ui_transparency
 
 local FRAME_1 = Drawing.new("Square")
 FRAME_1.Filled = true
@@ -38,7 +140,7 @@ FRAME_1.Visible = true
 FRAME_1.Size = {FRAME_0.Size.x - 2.5, FRAME_0.Size.y - 2.5}
 FRAME_1.Position = {FRAME_0.Position.x + 1.25, FRAME_0.Position.y + 1.25}
 FRAME_1.Color = {215, 215, 215}
-FRAME_1.Transparency = ui_transparency
+FRAME_1.Transparency = SETTINGS.ui.transparency
 
 local FRAME_2 = Drawing.new("Square")
 FRAME_2.Filled = true
@@ -46,7 +148,7 @@ FRAME_2.Visible = true
 FRAME_2.Size = {FRAME_1.Size.x - 3, FRAME_1.Size.y - 4}
 FRAME_2.Position = {FRAME_1.Position.x + 1.35, FRAME_1.Position.y + 2}
 FRAME_2.Color = {20, 20, 20}
-FRAME_2.Transparency = ui_transparency
+FRAME_2.Transparency = SETTINGS.ui.transparency
 
 local FRAME_3 = Drawing.new("Square")
 FRAME_3.Filled = true
@@ -54,7 +156,7 @@ FRAME_3.Visible = true
 FRAME_3.Size = {FRAME_2.Size.x - 3, FRAME_2.Size.y - 4}
 FRAME_3.Position = {FRAME_2.Position.x + 1.5, FRAME_2.Position.y + 2}
 FRAME_3.Color = {40, 40, 40}
-FRAME_3.Transparency = ui_transparency
+FRAME_3.Transparency = SETTINGS.ui.transparency
 
 local TITLE_FRAME = Drawing.new("Square")
 TITLE_FRAME.Filled = true
@@ -62,7 +164,7 @@ TITLE_FRAME.Visible = true
 TITLE_FRAME.Size = {FRAME_3.Size.x - 10, 20}
 TITLE_FRAME.Position = {FRAME_3.Position.x + 5, FRAME_3.Position.y + 5}
 TITLE_FRAME.Color = {25, 25, 25}
-TITLE_FRAME.Transparency = ui_transparency
+TITLE_FRAME.Transparency = SETTINGS.ui.transparency
 
 local TITLE = Drawing.new("Text")
 TITLE.Text = "universal mod checker"
@@ -73,9 +175,9 @@ TITLE.Position = {
     TITLE_FRAME.Position.y + TITLE_FRAME.Size.y / 2 - TITLE.Size / 2
 }
 TITLE.Color = {255, 255, 255}
-TITLE.Size = 15
-TITLE.Font = 4
-TITLE.Transparency = text_transparency
+TITLE.Size = SETTINGS.text.size
+TITLE.Font = SETTINGS.text.font
+TITLE.Transparency = SETTINGS.text.transparency
 
 local TEXT_FRAME = Drawing.new("Square")
 TEXT_FRAME.Filled = true
@@ -86,7 +188,7 @@ TEXT_FRAME.Position = {
     TITLE_FRAME.Position.y + TITLE_FRAME.Size.y + 5
 }
 TEXT_FRAME.Color = {25, 25, 25}
-TEXT_FRAME.Transparency = ui_transparency
+TEXT_FRAME.Transparency = SETTINGS.ui.transparency
 
 local TEXT_LABEL = Drawing.new("Text")
 TEXT_LABEL.Text = "0 mods detected"
@@ -97,36 +199,149 @@ TEXT_LABEL.Position = {
     TEXT_FRAME.Position.y + TEXT_FRAME.Size.y / 2
 }
 TEXT_LABEL.Color = {255, 255, 255}
-TEXT_LABEL.Size = text_size
-TEXT_LABEL.Font = font
-TEXT_LABEL.Transparency = text_transparency
+TEXT_LABEL.Size = SETTINGS.text.size
+TEXT_LABEL.Font = SETTINGS.text.font
+TEXT_LABEL.Transparency = SETTINGS.text.transparency
+
+local ishovered = function()
+    if not MOUSE_SERVICE then return false end
+    local mouse_position = getmouselocation(MOUSE_SERVICE)
+    local within_x = mouse_position.x >= FRAME_0.Position.x and mouse_position.x <= FRAME_0.Position.x + FRAME_0.Size.x
+    local within_y = mouse_position.y >= FRAME_0.Position.y and mouse_position.y <= FRAME_0.Position.y + FRAME_0.Size.y
+    return within_x and within_y
+end
+
+spawn(function()
+    while true do
+        if SETTINGS.ui.keybind and table.find(getpressedkeys() or {}, SETTINGS.ui.keybind) then
+            local visible = not FRAME_0.Visible
+            FRAME_0.Visible = visible
+            FRAME_1.Visible = visible
+            FRAME_2.Visible = visible
+            FRAME_3.Visible = visible
+            TITLE_FRAME.Visible = visible
+            TEXT_FRAME.Visible = visible
+            TITLE.Visible = visible
+            TEXT_LABEL.Visible = visible
+            wait(0.1)
+        end
+        wait(1/220)
+    end
+end)
+
+spawn(function() -- dragging by king bob
+    local is_dragging = false
+    local drag_offset = {x = 0, y = 0}
+    while true do
+        if MOUSE_SERVICE and SETTINGS.ui.draggable then
+            local mouse_position = getmouselocation(MOUSE_SERVICE)
+            if mouse_position then
+                if isleftpressed() and ishovered() then
+                    if not is_dragging then
+                        is_dragging = true
+                        drag_offset.x = mouse_position.x - FRAME_0.Position.x
+                        drag_offset.y = mouse_position.y - FRAME_0.Position.y
+                    end
+                elseif not isleftpressed() then
+                    is_dragging = false
+                end
+                if is_dragging then
+                    FRAME_0.Position = {
+                        mouse_position.x - drag_offset.x,
+                        mouse_position.y - drag_offset.y
+                    }
+                    FRAME_1.Position = {
+                        FRAME_0.Position.x + 1.25, 
+                        FRAME_0.Position.y + 1.25
+                    }
+                    FRAME_2.Position = {
+                        FRAME_1.Position.x + 1.35, 
+                        FRAME_1.Position.y + 2
+                    }
+                    FRAME_3.Position = {
+                        FRAME_2.Position.x + 1.5, 
+                        FRAME_2.Position.y + 2
+                    }
+                    TITLE_FRAME.Position = {
+                        FRAME_3.Position.x + 5, 
+                        FRAME_3.Position.y + 5
+                    }
+                    TITLE.Position = {
+                        TITLE_FRAME.Position.x + TITLE_FRAME.Size.x / 2,
+                        TITLE_FRAME.Position.y + TITLE_FRAME.Size.y / 2 - TITLE.Size / 2
+                    }
+                    TEXT_FRAME.Position = {
+                        FRAME_3.Position.x + 5,
+                        TITLE_FRAME.Position.y + TITLE_FRAME.Size.y + 5
+                    }
+                    local detected_count = 0
+                    if TEXT_LABEL.Text then
+                        local match = TEXT_LABEL.Text:match("(%d+) mod")
+                        detected_count = tonumber(match) or 0
+                    end
+                    TEXT_LABEL.Position = {
+                        TEXT_FRAME.Position.x + TEXT_FRAME.Size.x / 2,
+                        TEXT_FRAME.Position.y + TEXT_FRAME.Size.y / 2 - TEXT_LABEL.Size / 2 - (SETTINGS.text.base_offset * detected_count)
+                    }
+                end
+            end
+        end
+        wait(1/330)
+    end
+end)
 
 spawn(function()
     while true do
         local detected_mods = {}
         for index, player in game.Players:GetChildren() do
-            local user_id = getuserid(player.Data)
-            for index, mod_id in mods_user_ids do
+            local user_id = cached_getuserid(player.Data)
+            for index, mod_id in SETTINGS.mods.user_ids do
                 if user_id == mod_id then
-                    if getdisplayname(player.Data) ~= player.Name then
-                        table.insert(detected_mods, getdisplayname(player.Data).." ("..player.Name..")")
-                    else
-                        table.insert(detected_mods, player.Name)
+                    local found = false
+                    local display_name = cached_getdisplayname(player.Data)
+                    local string = (display_name ~= player.Name) and (display_name.." ("..player.Name..")") or player.Name
+                    for index, mod in in_game_mods do
+                        if mod == string then
+                            found = true
+                            break
+                        end
                     end
+                    if not found then
+                        notification("universal mod checker | moderator "..string.." joined", 5)
+                        table.insert(in_game_mods, string)
+                    end
+                    table.insert(detected_mods, string)
                 end
             end
-            wait(0)
+            wait(1/220)
         end
         if #detected_mods > 0 then
             TEXT_LABEL.Text = #detected_mods .. " mod detected\n" .. table.concat(detected_mods, "\n")
         else
             TEXT_LABEL.Text = "0 mods detected"
         end
-        local offset = base_offset * #detected_mods
         TEXT_LABEL.Position = {
             TEXT_FRAME.Position.x + TEXT_FRAME.Size.x / 2,
-            TEXT_FRAME.Position.y + TEXT_FRAME.Size.y / 2 - TEXT_LABEL.Size / 2 - offset
+            TEXT_FRAME.Position.y + TEXT_FRAME.Size.y / 2 - TEXT_LABEL.Size / 2 - (SETTINGS.text.base_offset * #detected_mods)
         }
-        wait(1)
+        wait(1/220)
     end
+end)
+
+spawn(function()
+    for i = #in_game_mods, 1, -1 do
+        local is_in_game
+        for index, mod in detected_mods do
+            if mod == in_game_mods[i] then
+                is_in_game = true
+                break
+            end
+            wait(1/220)
+        end
+        if not is_in_game then
+            notification("universal mod checker | moderator "..in_game_mods[i].." left", 5)
+            table.remove(in_game_mods, i)
+        end
+    end
+    wait(1)
 end)
