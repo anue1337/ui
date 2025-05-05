@@ -1,0 +1,96 @@
+local function gettransparency(part)
+	local memval = getmemoryvalue(part.Data, 0xf8, "float")
+	if memval == 1 then
+		return "Invisible"
+	else
+		return "Visible"
+	end
+end
+
+local ws = findservice(Game, 'Workspace')
+local player_service = findservice(Game, 'Players')
+
+local camera = findfirstchild(ws, 'Camera')
+
+local getboxsize = function(torso)
+	local cf = getcframe(torso)
+	local uv = cf.upvector
+	local pos = cf.position
+	local cam_uv = getupvector(camera)
+
+	local top = {
+		pos.x + uv.x * 1.8 + cam_uv.x,
+		pos.y + uv.y * 1.8 + cam_uv.y,
+		pos.z + uv.z * 1.8 + cam_uv.z
+	}
+
+	local bottom = {
+		pos.x - uv.x * 2.5 - cam_uv.x,
+		pos.y - uv.y * 2.5 - cam_uv.y,
+		pos.z - uv.z * 2.5 - cam_uv.z
+	}
+
+	local top_vp, top_visible = worldtoscreenpoint(top)
+	local bottom_vp, bottom_visible = worldtoscreenpoint(bottom)
+
+	if top_visible and bottom_visible then
+		local width = math.max(math.abs(top_vp.x - bottom_vp.x), 3)
+		local height = math.max(math.abs(bottom_vp.y - top_vp.y), 3)
+
+		local size = {
+			x = math.floor(math.max(height / 1.8, width)),
+			y = math.floor(height)
+		}
+
+		local position = {
+			x = math.floor((top_vp.x + bottom_vp.x) * 0.5 - size.x * 0.5),
+			y = math.floor(math.min(top_vp.y, bottom_vp.y))
+		}
+
+		return size, position
+	end
+
+	return {x = 0, y = 0}, {x = 0, y = 0}
+end
+
+for i,plr in pairs(game.Players:GetChildren()) do
+
+	local visibletext = Drawing.new("Text")
+	visibletext.Text = "INVISIBLE"
+	visibletext.Color = {255,0,0}
+	visibletext.Visible = false
+	visibletext.zIndex = 1
+
+	spawn(function()
+		while wait() do
+
+			local chr = plr.Character
+			local totalinvis = 0
+			for a,part in pairs(chr:GetChildren()) do
+				if (part.ClassName == "Part" or part.ClassName == "BasePart") and part.Name ~= "HumanoidRootPart" then
+					local transparency = gettransparency(part)
+					if transparency == "Invisible" then
+						totalinvis += 1
+					end
+				end
+			end
+
+			if totalinvis == 6 then
+				visibletext.Visible = true
+			else
+				visibletext.Visible = false
+			end
+
+
+			local torso = findfirstchild(getcharacter(plr.Data), "Torso")
+			local cf = getcframe(torso)
+			local cfpos = cf.position
+			local actualpos = {cfpos.x,cfpos.y,cfpos.z}
+			local sum1,sum2 = worldtoscreenpoint(actualpos)
+			local textbounds= visibletext.TextBounds
+			visibletext.Position = {sum1.x-(textbounds.x/2),sum1.y}
+
+		end
+	end)
+
+end
