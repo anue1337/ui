@@ -1,0 +1,212 @@
+--// Services
+local game = Game
+local workspace = findservice(game, 'Workspace')
+
+--// Variables
+local ignoredNames = {
+    ["Default"] = true,
+    ["Model"] = true
+}
+local knownModels = {} -- Maps model names to tables of {id = modelId, added = timestamp}
+local targetedModels = {} -- Models we're actually targeting
+local searchInterval = 0.5 -- Search every 0.5 seconds (increased from 1 second)
+
+--// Helper Functions
+local function setupTargetModel(model)
+    local head = findfirstchild(model, 'Head')
+    if not head then
+        return false
+    end
+    
+    -- Try to find other body parts
+    local torso = findfirstchild(model, 'Torso') or findfirstchild(model, 'UpperTorso')
+    local leftArm = findfirstchild(model, 'Left Arm') or findfirstchild(model, 'LeftUpperArm')
+    local rightArm = findfirstchild(model, 'Right Arm') or findfirstchild(model, 'RightUpperArm')
+    local leftLeg = findfirstchild(model, 'Left Leg') or findfirstchild(model, 'LeftUpperLeg')
+    local rightLeg = findfirstchild(model, 'Right Leg') or findfirstchild(model, 'RightUpperLeg')
+    local humanoid = findfirstchild(model, 'Humanoid')
+    local rootPart = findfirstchild(model, 'HumanoidRootPart')
+    
+    if not torso or not rootPart then
+        -- If critical parts aren't found, try to use head for all
+        torso = head
+        leftArm = head
+        rightArm = head
+        leftLeg = head
+        rightLeg = head
+        rootPart = head
+    end
+    
+    local modelName = getname(model)
+    local modelId = tostring(model)
+    
+    -- Prepare body parts data
+    local bodyPartsData = {
+        {name = "LowerTorso", part = torso},
+        {name = "LeftUpperArm", part = leftArm},
+        {name = "LeftLowerArm", part = leftArm},
+        {name = "RightUpperArm", part = rightArm},
+        {name = "RightLowerArm", part = rightArm},
+        {name = "LeftUpperLeg", part = leftLeg},
+        {name = "LeftLowerLeg", part = leftLeg},
+        {name = "RightUpperLeg", part = rightLeg},
+        {name = "RightLowerLeg", part = rightLeg}
+    }
+    
+    -- Prepare full body data
+    local fullBodyData = {
+        {name = "Head", part = head},
+        {name = "UpperTorso", part = torso},
+        {name = "LowerTorso", part = torso},
+        {name = "LeftUpperArm", part = leftArm},
+        {name = "LeftLowerArm", part = leftArm},
+        {name = "LeftHand", part = leftArm},
+        {name = "RightUpperArm", part = rightArm},
+        {name = "RightLowerArm", part = rightArm},
+        {name = "RightHand", part = rightArm},
+        {name = "LeftUpperLeg", part = leftLeg},
+        {name = "LeftLowerLeg", part = leftLeg},
+        {name = "LeftFoot", part = leftLeg},
+        {name = "RightUpperLeg", part = rightLeg},
+        {name = "RightLowerLeg", part = rightLeg},
+        {name = "RightFoot", part = rightLeg}
+    }
+    
+    local data = {
+        Username = modelName,
+        Displayname = modelName,
+        Userid = 0,
+        Character = model,
+        PrimaryPart = rootPart,
+        Humanoid = humanoid or rootPart,
+        Head = head,
+        Torso = torso,
+        LeftArm = leftArm,
+        LeftLeg = leftLeg,
+        RightArm = rightArm,
+        RightLeg = rightLeg,
+        BodyHeightScale = 1,
+        RigType = 0,
+        Whitelisted = false,
+        Archenemies = false,
+        Aimbot_Part = head,
+        Aimbot_TP_Part = head,
+        Triggerbot_Part = head,
+        Health = 100,
+        MaxHealth = 100,
+        body_parts_data = bodyPartsData,
+        full_body_data = fullBodyData
+    }
+    
+    add_model_data(data, modelId)
+    print("Added target model: " .. modelName .. " (ID: " .. modelId .. ")")
+    return true
+end
+
+local function removeTargetModel(modelId)
+    if targetedModels[modelId] then
+        remove_model_data(modelId)
+        targetedModels[modelId] = nil
+        print("Removed target model: " .. modelId)
+    end
+end
+
+local function trackAllModels()
+    -- First scan to gather all models and track when they first appeared
+    local currentTime = tick()
+    local allModelsInWorkspace = {}
+    
+    for _, child in getchildren(workspace) do
+        if getclassname(child) == "Model" then
+            local name = getname(child)
+            if ignoredNames[name] then
+                continue
+            end
+            
+            local modelId = tostring(child)
+            allModelsInWorkspace[modelId] = true
+            
+            -- If this is a new model we've never seen before, track it
+            if not knownModels[name] then
+                knownModels[name] = {}
+            end
+            
+            -- Add this model to our tracking if it's not already tracked
+            local found = false
+            for _, modelData in pairs(knownModels[name]) do
+                if modelData.id == modelId then
+                    found = true
+                    break
+                end
+            end
+            
+            if not found then
+                table.insert(knownModels[name], {
+                    id = modelId,
+                    added = currentTime,
+                    model = child
+                })
+            end
+        end
+    end
+    
+    -- Clean up any models that no longer exist
+    for name, models in pairs(knownModels) do
+        local stillExist = {}
+        for i, modelData in pairs(models) do
+            if allModelsInWorkspace[modelData.id] then
+                table.insert(stillExist, modelData)
+            else
+                -- Remove from targeting if it was targeted
+                removeTargetModel(modelData.id)
+            end
+        end
+        
+        if #stillExist == 0 then
+            knownModels[name] = nil
+        else
+            knownModels[name] = stillExist
+        end
+    end
+    
+    -- Now identify duplicates and only target the earliest models
+    for name, models in pairs(knownModels) do
+        if #models >= 2 then
+            -- Sort models by when they were added (oldest first)
+            table.sort(models, function(a, b)
+                return a.added < b.added
+            end)
+            
+            -- Only target the first model (original one)
+            local originalModel = models[1].model
+            local modelId = models[1].id
+            
+            -- If not already targeted, add it
+            if not targetedModels[modelId] then
+                if setupTargetModel(originalModel) then
+                    targetedModels[modelId] = true
+                end
+            end
+            
+            -- Make sure any newer duplicates are NOT targeted
+            for i = 2, #models do
+                removeTargetModel(models[i].id)
+            end
+        else
+            -- If there's only one model with this name, we don't target it
+            removeTargetModel(models[1].id)
+        end
+    end
+end
+
+--// Main Logic
+local function modelTracker()
+    while wait(searchInterval) do -- Now uses the searchInterval variable (0.5 seconds)
+        trackAllModels()
+    end
+end
+
+--// Start the script
+print("Starting model tracker (targeting only original models, scanning every " .. searchInterval .. " seconds)")
+clear_model_data()
+spawn(modelTracker)
