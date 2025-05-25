@@ -1,8 +1,11 @@
 local Workspace = findfirstchildofclass(Game, "Workspace")
 local LocalPlayer = nil 
 local TrackedModels = {}
+local InitialScanDone = false
 
 local function IsValidModel(Model)
+    if not Model or not getparent(Model) then return false end
+
     local Head = findfirstchild(Model, "Head")
     local HumanoidRootPart = findfirstchild(Model, "HumanoidRootPart")
     local Torso = findfirstchild(Model, "Torso") or findfirstchild(Model, "LowerTorso")
@@ -10,29 +13,36 @@ local function IsValidModel(Model)
     return Head ~= nil and HumanoidRootPart ~= nil
 end
 
+local function ScanForPlayers()
+    local Models = getchildren(Workspace)
+    local ValidModels = {}
+
+    for _, Model in ipairs(Models) do
+        if getname(Model) == "Model" and IsValidModel(Model) then
+            table.insert(ValidModels, Model)
+        end
+    end
+
+    return ValidModels
+end
+
 local function FindLocalPlayer()
     if LocalPlayer and IsValidModel(LocalPlayer) then
         return 
     end
 
-    local Models = getchildren(Workspace)
-    for _, Model in ipairs(Models) do
-        if getname(Model) == "Model" and IsValidModel(Model) then
-
-            LocalPlayer = Model
-            break
-        end
+    local ValidModels = ScanForPlayers()
+    for _, Model in ipairs(ValidModels) do
+        LocalPlayer = Model
+        break
     end
 end
-
-
 
 local function TeamCheck(Entity)
     return false
 end
 
 local function GetBodyParts(Model)
-
     return {
         Head = findfirstchild(Model, "Head"),
         LeftArm = findfirstchild(Model, "LeftUpperArm") or findfirstchild(Model, "LeftLowerArm"),
@@ -91,10 +101,44 @@ local function PlayerData(Model, Parts)
     return tostring(Model), Data
 end
 
-local function Update()
+local function ProcessModel(Model)
+    if not Model or not IsValidModel(Model) then return end
 
+    local Key = tostring(Model)
+    local Parts = GetBodyParts(Model)
+
+    if not TrackedModels[Key] then
+        local ID, Data = PlayerData(Model, Parts)
+        if ID and Data and add_model_data(Data, ID) then
+            TrackedModels[ID] = Model
+            return true
+        end
+    end
+    return false
+end
+
+local function InitialScan()
+    if InitialScanDone then return end
+
+    local ValidModels = ScanForPlayers()
+    local AddedCount = 0
+
+    for _, Model in ipairs(ValidModels) do
+        if Model ~= LocalPlayer and ProcessModel(Model) then
+            AddedCount = AddedCount + 1
+        end
+    end
+
+    InitialScanDone = true
+end
+
+local function Update()
     if not LocalPlayer then
         FindLocalPlayer()
+    end
+
+    if not InitialScanDone then
+        InitialScan()
     end
 
     local Models = getchildren(Workspace)
@@ -105,12 +149,9 @@ local function Update()
             local Key = tostring(Obj)
             local Parts = GetBodyParts(Obj)
 
-
-            local Key = tostring(Obj)
             if not TrackedModels[Key] then
                 local ID, Data = PlayerData(Obj, Parts)
                 if ID and Data and add_model_data(Data, ID) then
-                    print("Added model: " .. ID) 
                     TrackedModels[ID] = Obj
                 end
             end
@@ -120,7 +161,6 @@ local function Update()
 
     for Key, Model in pairs(TrackedModels) do
         if not Seen[Key] then
-            print("Model removed: " .. Key) 
             remove_model_data(Key)
             TrackedModels[Key] = nil
         end
@@ -169,27 +209,27 @@ local function LocalPlayerData()
         UpperTorso = Parts.Torso,
     }
 
-    print("Applying local data")
-
     override_local_data(LocalData)
 end
 
 spawn(function()
     FindLocalPlayer()
-    LocalPlayerData()
+    if LocalPlayer then
+        LocalPlayerData()
+        InitialScan()
+    end
 end)
 
 spawn(function()
-    print("Starting main loop") 
     while true do
-        wait(0.2)
+        wait(0.1)
         Update()
     end
 end)
 
 spawn(function()
     while true do
-        wait(1)
+        wait(0.5)
         LocalPlayerData()
     end
 end)
