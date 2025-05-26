@@ -1,0 +1,149 @@
+local Workspace = findfirstchildofclass(Game, "Workspace")
+local TrackedModels = {}
+local LastCheckTime = 0
+local ResetThreshold = 10 
+
+local function GetBodyParts(Model)
+    return {
+        Head = findfirstchild(Model, "Head"),
+        Torso = findfirstchild(Model, "Torso"),
+        LeftArm = findfirstchild(Model, "Left Arm"),
+        RightArm = findfirstchild(Model, "Right Arm"),
+        LeftLeg = findfirstchild(Model, "Left Leg"),
+        RightLeg = findfirstchild(Model, "Right Leg"),
+        HumanoidRootPart = findfirstchild(Model, "HumanoidRootPart")
+    }
+end
+
+local function IsValidModel(Model)
+    if not Model or not getparent(Model) then 
+        return false 
+    end
+
+    if getclassname(Model) ~= "Model" then
+        return false
+    end
+
+    local humanoid = findfirstchild(Model, "Humanoid")
+    local head = findfirstchild(Model, "Head")
+    local torso = findfirstchild(Model, "Torso")
+
+    if not humanoid or not head or not torso then
+        return false
+    end
+
+    if getname(Model) == "DisplayModel" then
+        return false
+    end
+
+    return true
+end
+
+local function PlayerData(Model, Parts)
+    local Humanoid = findfirstchild(Model, "Humanoid")
+    local Health = gethealth(Humanoid)
+
+    local Data = {
+        Username = getname(Model),
+        Displayname = getname(Model),
+        Userid = -1,
+        Character = Model,
+        PrimaryPart = Parts.HumanoidRootPart,
+        Humanoid = Humanoid,
+        Head = Parts.Head,
+        Torso = Parts.Torso,
+        LeftArm = Parts.LeftArm,
+        RightArm = Parts.RightArm,
+        LeftLeg = Parts.LeftLeg,
+        RightLeg = Parts.RightLeg,
+        BodyHeightScale = 1,
+        RigType = 0, 
+        Whitelisted = false,
+        Archenemies = false,
+        Aimbot_Part = Parts.Head,
+        Aimbot_TP_Part = Parts.Head,
+        Triggerbot_Part = Parts.Head,
+        Health = Health,
+        MaxHealth = getmaxhealth(Humanoid),
+
+        body_parts_data = {
+            { name = "LowerTorso", part = Parts.Torso },
+            { name = "LeftUpperLeg", part = Parts.LeftLeg },
+            { name = "RightUpperLeg", part = Parts.RightLeg },
+            { name = "LeftUpperArm", part = Parts.LeftArm },
+            { name = "RightUpperArm", part = Parts.RightArm }
+        },
+        full_body_data = {
+            { name = "Head", part = Parts.Head },
+            { name = "HumanoidRootPart", part = Parts.HumanoidRootPart },
+
+            { name = "LowerTorso", part = Parts.Torso },
+            { name = "LeftUpperArm", part = Parts.LeftArm },
+            { name = "RightUpperArm", part = Parts.RightArm },
+            { name = "LeftUpperLeg", part = Parts.LeftLeg },
+            { name = "RightUpperLeg", part = Parts.RightLeg }
+        }
+    }
+
+    return getname(Model), Data
+end
+
+local function CleanupAllTrackedModels()
+    for Key, _ in pairs(TrackedModels) do
+        remove_model_data(Key)
+    end
+    TrackedModels = {}
+end
+
+local function Update()
+    local CurrentTime = os.time()
+    local Models = getchildren(Workspace)
+    local Seen = {}
+    local ValidModelsFound = false
+
+    for _, Model in ipairs(Models) do
+        if IsValidModel(Model) then
+            ValidModelsFound = true
+            local Key = getname(Model)
+            local Parts = GetBodyParts(Model)
+
+            if Model ~= getcharacter(getlocalplayer()) then
+                if not TrackedModels[Key] then
+                    local ID, Data = PlayerData(Model, Parts)
+                    if add_model_data(Data, ID) then
+                        TrackedModels[ID] = Model
+                    end
+                else
+                    local humanoid = findfirstchild(Model, "Humanoid")
+                    if humanoid then
+                        edit_model_data({Health = gethealth(humanoid)}, Key)
+                    end
+                end
+                Seen[Key] = true
+            end
+        end
+    end
+
+    for Key, Model in pairs(TrackedModels) do
+        if not Seen[Key] then
+            remove_model_data(Key)
+            TrackedModels[Key] = nil
+        end
+    end
+
+    if not ValidModelsFound then
+        if CurrentTime - LastCheckTime > ResetThreshold then
+            CleanupAllTrackedModels()
+            LastCheckTime = CurrentTime
+        end
+    else
+        LastCheckTime = CurrentTime
+    end
+end
+
+spawn(function()
+    while true do
+        wait(0.1)  
+        Update()
+    end
+end)
