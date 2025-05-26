@@ -1,0 +1,226 @@
+local Workspace = findfirstchildofclass(Game, "Workspace")
+local RunnersFolder = findfirstchild(Workspace, "Runners")
+local SkinwalkerContainer = findfirstchild(RunnersFolder, "Skinwalkers")
+local TrackedModels = {}
+local LastCheckTime = 0
+local ResetThreshold = 10 -- Segundos
+
+local function GetBodyParts(Model)
+	local Parts = {}
+
+	-- Safely get each part
+	local function SafeGetPart(name)
+		local part = findfirstchild(Model, name)
+		return part
+	end
+
+	Parts.Head = SafeGetPart("Head")
+	Parts.UpperTorso = SafeGetPart("UpperTorso")
+	Parts.LowerTorso = SafeGetPart("LowerTorso")
+	Parts.Torso = SafeGetPart("Torso")
+
+	-- R15 parts
+	Parts.LeftUpperArm = SafeGetPart("LeftUpperArm")
+	Parts.LeftLowerArm = SafeGetPart("LeftLowerArm")
+	Parts.LeftHand = SafeGetPart("LeftHand")
+	Parts.RightUpperArm = SafeGetPart("RightUpperArm")
+	Parts.RightLowerArm = SafeGetPart("RightLowerArm")
+	Parts.RightHand = SafeGetPart("RightHand")
+	Parts.LeftUpperLeg = SafeGetPart("LeftUpperLeg")
+	Parts.LeftLowerLeg = SafeGetPart("LeftLowerLeg")
+	Parts.LeftFoot = SafeGetPart("LeftFoot")
+	Parts.RightUpperLeg = SafeGetPart("RightUpperLeg")
+	Parts.RightLowerLeg = SafeGetPart("RightLowerLeg")
+	Parts.RightFoot = SafeGetPart("RightFoot")
+
+	-- R6 parts
+	Parts.LeftArm = SafeGetPart("LeftArm")
+	Parts.RightArm = SafeGetPart("RightArm")
+	Parts.LeftLeg = SafeGetPart("LeftLeg")
+	Parts.RightLeg = SafeGetPart("RightLeg")
+
+	Parts.HumanoidRootPart = SafeGetPart("HumanoidRootPart")
+
+	return Parts
+end
+
+local function NPCData(Model, Parts)
+	local Humanoid = findfirstchild(Model, "Humanoid")
+	local Health = gethealth(Humanoid)
+
+	-- Helper function to safely create data entries
+	local function SafePart(primary, fallback)
+		if primary then
+			return primary
+		elseif fallback then
+			return fallback
+		else
+			return nil
+		end
+	end
+
+	local Data = {
+		Username = tostring(Model),
+		Displayname = getname(Model),
+		Userid = -1,
+		Character = Model,
+		PrimaryPart = getprimarypart(Model),
+		Humanoid = Humanoid,
+		Head = Parts.Head,
+		Torso = SafePart(Parts.Torso, Parts.UpperTorso),
+		UpperTorso = Parts.UpperTorso,
+		LowerTorso = Parts.LowerTorso,
+		LeftArm = SafePart(Parts.LeftArm, Parts.LeftUpperArm),
+		LeftLeg = SafePart(Parts.LeftLeg, Parts.LeftUpperLeg),
+		RightArm = SafePart(Parts.RightArm, Parts.RightUpperArm),
+		RightLeg = SafePart(Parts.RightLeg, Parts.RightUpperLeg),
+		LeftUpperArm = Parts.LeftUpperArm,
+		LeftLowerArm = Parts.LeftLowerArm,
+		LeftHand = Parts.LeftHand,
+		RightUpperArm = Parts.RightUpperArm,
+		RightLowerArm = Parts.RightLowerArm,
+		RightHand = Parts.RightHand,
+		LeftUpperLeg = Parts.LeftUpperLeg,
+		LeftLowerLeg = Parts.LeftLowerLeg,
+		LeftFoot = Parts.LeftFoot,
+		RightUpperLeg = Parts.RightUpperLeg,
+		RightLowerLeg = Parts.RightLowerLeg,
+		RightFoot = Parts.RightFoot,
+		BodyHeightScale = 1,
+		RigType = findfirstchild(Model, "Torso") and 0 or 1,
+		Whitelisted = false,
+		Archenemies = false,
+		Aimbot_Part = Parts.HumanoidRootPart or Parts.Head,
+		Aimbot_TP_Part = Parts.HumanoidRootPart or Parts.Head,
+		Triggerbot_Part = Parts.HumanoidRootPart or Parts.Head,
+		Health = Health,
+		MaxHealth = getmaxhealth(Humanoid)
+	}
+
+	-- Create filtered body_parts_data with only standard R15 parts
+	Data.body_parts_data = {}
+	local bodyPartsList = {
+		{ name = "LowerTorso", part = Parts.LowerTorso },
+		{ name = "LeftUpperLeg", part = Parts.LeftUpperLeg },
+		{ name = "LeftLowerLeg", part = Parts.LeftLowerLeg },
+		{ name = "RightUpperLeg", part = Parts.RightUpperLeg },
+		{ name = "RightLowerLeg", part = Parts.RightLowerLeg },
+		{ name = "LeftUpperArm", part = Parts.LeftUpperArm },
+		{ name = "LeftLowerArm", part = Parts.LeftLowerArm },
+		{ name = "RightUpperArm", part = Parts.RightUpperArm },
+		{ name = "RightLowerArm", part = Parts.RightLowerArm }
+	}
+
+	for _, item in ipairs(bodyPartsList) do
+		if item.part then
+			table.insert(Data.body_parts_data, item)
+		end
+	end
+
+	-- Simplified full_body_data with focus on HumanoidRootPart
+	Data.full_body_data = {
+		{ name = "HumanoidRootPart", part = Parts.HumanoidRootPart }
+	}
+
+	-- Add other parts if they exist
+	if Parts.Head then
+		table.insert(Data.full_body_data, { name = "Head", part = Parts.Head })
+	end
+
+	return tostring(Model), Data
+end
+
+local function CleanupAllTrackedModels()
+    for Key, _ in pairs(TrackedModels) do
+        remove_model_data(Key)
+    end
+    TrackedModels = {}
+end
+
+local function CheckSkinwalkerContainer()
+    -- Verificar se o contêiner ainda existe
+    if not SkinwalkerContainer or not getparent(SkinwalkerContainer) then
+        -- Tenta encontrar o contêiner novamente
+        local RunnersFolder = findfirstchild(Workspace, "Runners")
+        if not RunnersFolder then
+            CleanupAllTrackedModels()
+            return false
+        end
+
+        SkinwalkerContainer = findfirstchild(RunnersFolder, "Skinwalkers")
+        if not SkinwalkerContainer then
+            -- Se não encontramos, limpamos tudo e retornamos false
+            CleanupAllTrackedModels()
+            return false
+        end
+    end
+    return true
+end
+
+local function Update()
+    -- Verificar se precisamos reiniciar a detecção
+    local CurrentTime = os.time()
+
+    -- Verificar se o contêiner de skinwalkers existe
+    if not CheckSkinwalkerContainer() then
+        LastCheckTime = CurrentTime
+        return
+    end
+
+    local Skinwalkers = getchildren(SkinwalkerContainer) or {}
+    local Seen = {}
+    local SkinwalkerCount = #Skinwalkers
+
+    -- Se não há skinwalkers e faz tempo que verificamos, reseta tudo
+    if SkinwalkerCount == 0 then
+        if CurrentTime - LastCheckTime > ResetThreshold then
+            CleanupAllTrackedModels()
+            LastCheckTime = CurrentTime
+        end
+        return
+    else
+        LastCheckTime = CurrentTime
+    end
+
+    -- Processa os skinwalkers existentes
+    for _, Skinwalker in ipairs(Skinwalkers) do
+        local Humanoid = findfirstchild(Skinwalker, "Humanoid")
+        local HumanoidRootPart = findfirstchild(Skinwalker, "HumanoidRootPart")
+
+        if Humanoid and getparent(Humanoid) and HumanoidRootPart then
+            if is_team_check_active() then
+                continue
+            end
+
+            local Key = tostring(Skinwalker)
+            local Parts = GetBodyParts(Skinwalker)
+
+            if HumanoidRootPart and Skinwalker ~= getcharacter(getlocalplayer()) then
+                if not TrackedModels[Key] then
+                    local ID, Data = NPCData(Skinwalker, Parts)
+                    if add_model_data(Data, ID) then
+                        TrackedModels[ID] = Skinwalker
+                    end
+                else
+                    edit_model_data({Health = gethealth(Humanoid)}, Key)
+                end
+                Seen[Key] = true
+            end
+        end
+    end
+
+    -- Remove skinwalkers que não estão mais presentes
+    for Key, Model in pairs(TrackedModels) do
+        if not Seen[Key] then
+            remove_model_data(Key)
+            TrackedModels[Key] = nil
+        end
+    end
+end
+
+spawn(function()
+    while true do
+		wait(0.1)  -- Pequeno atraso para melhorar performance
+		Update()
+	end
+end)
