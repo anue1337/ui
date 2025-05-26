@@ -1,0 +1,72 @@
+local toggleKey = "F4"
+local tpKey = "T"
+local speed = 3
+
+
+local ws = findservice(Game, "Workspace")
+local plrs = findservice(Game, "Players")
+local cam = findfirstchildofclass(ws, "Camera")
+if not cam then return end
+
+local lp = getlocalplayer()
+local c = getcharacter(lp)
+local hrp = c and findfirstchild(c, "HumanoidRootPart")
+
+local active = false
+local pos = getposition(cam)
+
+spawn(function()
+	while true do
+		local keys = getpressedkeys()
+		for _, k in ipairs(keys) do
+			if k == toggleKey then
+				active = not active
+				if active then pos = getposition(cam) end
+				wait(0.3)
+			end
+		end
+		wait()
+	end
+end)
+
+spawn(function()
+	while true do
+		if active then
+			local keys = getpressedkeys()
+			local f = getlookvector(cam)
+			local r = getrightvector(cam)
+			local m = {x=0,y=0,z=0}
+			for _, k in ipairs(keys) do
+				if k=="W" then m.x+=f.x m.y+=f.y m.z+=f.z
+				elseif k=="S" then m.x-=f.x m.y-=f.y m.z-=f.z
+				elseif k=="A" then m.x-=r.x m.y-=r.y m.z-=r.z
+				elseif k=="D" then m.x+=r.x m.y+=r.y m.z+=r.z
+				elseif k=="E" then m.y+=1
+				elseif k=="Q" then m.y-=1
+				end
+			end
+			pos.x+=m.x*speed
+			pos.y+=m.y*speed
+			pos.z+=m.z*speed
+			setposition(cam, {pos.x,pos.y,pos.z})
+		end
+		wait()
+	end
+end)
+
+spawn(function()
+	while true do
+		if active then
+			local keys = getpressedkeys()
+			for _, k in ipairs(keys) do
+				if k == tpKey then
+					c = getcharacter(lp)
+					hrp = c and findfirstchild(c, "HumanoidRootPart")
+					if hrp then setposition(hrp, {pos.x, pos.y, pos.z}) end
+					wait(0.3)
+				end
+			end
+		end
+		wait()
+	end
+end)
