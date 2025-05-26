@@ -3,12 +3,11 @@ local RunnersFolder = findfirstchild(Workspace, "Runners")
 local SkinwalkerContainer = findfirstchild(RunnersFolder, "Skinwalkers")
 local TrackedModels = {}
 local LastCheckTime = 0
-local ResetThreshold = 10 -- Segundos
+local ResetThreshold = 10 
 
 local function GetBodyParts(Model)
 	local Parts = {}
 
-	-- Safely get each part
 	local function SafeGetPart(name)
 		local part = findfirstchild(Model, name)
 		return part
@@ -19,7 +18,6 @@ local function GetBodyParts(Model)
 	Parts.LowerTorso = SafeGetPart("LowerTorso")
 	Parts.Torso = SafeGetPart("Torso")
 
-	-- R15 parts
 	Parts.LeftUpperArm = SafeGetPart("LeftUpperArm")
 	Parts.LeftLowerArm = SafeGetPart("LeftLowerArm")
 	Parts.LeftHand = SafeGetPart("LeftHand")
@@ -33,7 +31,6 @@ local function GetBodyParts(Model)
 	Parts.RightLowerLeg = SafeGetPart("RightLowerLeg")
 	Parts.RightFoot = SafeGetPart("RightFoot")
 
-	-- R6 parts
 	Parts.LeftArm = SafeGetPart("LeftArm")
 	Parts.RightArm = SafeGetPart("RightArm")
 	Parts.LeftLeg = SafeGetPart("LeftLeg")
@@ -48,7 +45,6 @@ local function NPCData(Model, Parts)
 	local Humanoid = findfirstchild(Model, "Humanoid")
 	local Health = gethealth(Humanoid)
 
-	-- Helper function to safely create data entries
 	local function SafePart(primary, fallback)
 		if primary then
 			return primary
@@ -97,7 +93,6 @@ local function NPCData(Model, Parts)
 		MaxHealth = getmaxhealth(Humanoid)
 	}
 
-	-- Create filtered body_parts_data with only standard R15 parts
 	Data.body_parts_data = {}
 	local bodyPartsList = {
 		{ name = "LowerTorso", part = Parts.LowerTorso },
@@ -117,12 +112,10 @@ local function NPCData(Model, Parts)
 		end
 	end
 
-	-- Simplified full_body_data with focus on HumanoidRootPart
 	Data.full_body_data = {
 		{ name = "HumanoidRootPart", part = Parts.HumanoidRootPart }
 	}
 
-	-- Add other parts if they exist
 	if Parts.Head then
 		table.insert(Data.full_body_data, { name = "Head", part = Parts.Head })
 	end
@@ -138,9 +131,9 @@ local function CleanupAllTrackedModels()
 end
 
 local function CheckSkinwalkerContainer()
-    -- Verificar se o contêiner ainda existe
+
     if not SkinwalkerContainer or not getparent(SkinwalkerContainer) then
-        -- Tenta encontrar o contêiner novamente
+
         local RunnersFolder = findfirstchild(Workspace, "Runners")
         if not RunnersFolder then
             CleanupAllTrackedModels()
@@ -149,7 +142,7 @@ local function CheckSkinwalkerContainer()
 
         SkinwalkerContainer = findfirstchild(RunnersFolder, "Skinwalkers")
         if not SkinwalkerContainer then
-            -- Se não encontramos, limpamos tudo e retornamos false
+
             CleanupAllTrackedModels()
             return false
         end
@@ -158,10 +151,9 @@ local function CheckSkinwalkerContainer()
 end
 
 local function Update()
-    -- Verificar se precisamos reiniciar a detecção
+
     local CurrentTime = os.time()
 
-    -- Verificar se o contêiner de skinwalkers existe
     if not CheckSkinwalkerContainer() then
         LastCheckTime = CurrentTime
         return
@@ -171,7 +163,6 @@ local function Update()
     local Seen = {}
     local SkinwalkerCount = #Skinwalkers
 
-    -- Se não há skinwalkers e faz tempo que verificamos, reseta tudo
     if SkinwalkerCount == 0 then
         if CurrentTime - LastCheckTime > ResetThreshold then
             CleanupAllTrackedModels()
@@ -182,7 +173,6 @@ local function Update()
         LastCheckTime = CurrentTime
     end
 
-    -- Processa os skinwalkers existentes
     for _, Skinwalker in ipairs(Skinwalkers) do
         local Humanoid = findfirstchild(Skinwalker, "Humanoid")
         local HumanoidRootPart = findfirstchild(Skinwalker, "HumanoidRootPart")
@@ -209,7 +199,6 @@ local function Update()
         end
     end
 
-    -- Remove skinwalkers que não estão mais presentes
     for Key, Model in pairs(TrackedModels) do
         if not Seen[Key] then
             remove_model_data(Key)
@@ -220,7 +209,7 @@ end
 
 spawn(function()
     while true do
-		wait(0.1)  -- Pequeno atraso para melhorar performance
+		wait(0.1)  
 		Update()
 	end
 end)
