@@ -1,0 +1,135 @@
+local Settings = {
+    ["Quick Save"] = "F",
+    ["Quick Peek"] = "E"
+}
+
+local Memory = {
+    Position = nil,
+    Visualization = nil,
+    Part = nil
+}
+
+local Cache = {
+    Player = getlocalplayer(),
+    Character = nil,
+    Root = nil,
+    Humanoid = nil
+}
+
+local Notified = 0
+local Elements = {}
+
+local function Bottom(Character)
+    return findfirstchild(Character, "RightFoot") or findfirstchild(Character, "Right Leg")
+end
+
+local function Floor()
+    if not Memory.Part then return end
+    local PartY = getposition(Memory.Part).y
+    return getname(Memory.Part) == "RightFoot" and PartY - 0.3 or PartY - 1
+end
+
+local function Main()
+    while true do
+        if not Cache.Humanoid or gethealth(Cache.Humanoid) <= 0 then
+            Cache.Character = getcharacter(Cache.Player)
+            if Cache.Character then
+                Cache.Humanoid = findfirstchildofclass(Cache.Character, "Humanoid") or waitforchild(Cache.Character, "Humanoid")
+                Cache.Root = findfirstchild(Cache.Character, "HumanoidRootPart") or waitforchild(Cache.Character, "HumanoidRootPart")
+                if not Memory.Part and Cache.Humanoid then
+                    Memory.Part = Bottom(Cache.Character)
+                end
+            end
+        end
+        wait(0.25)
+    end
+end
+
+local function Draw()
+    for i = 1, 20 do
+        Elements[i] = Drawing.new("Line")
+        Elements[i].Visible = false
+        Elements[i].Thickness = i > 10 and 3 or 1
+        Elements[i].zIndex = i > 10 and 1 or 2
+        Elements[i].Color = i > 10 and {0, 0, 0} or {160, 0, 7}
+    end
+end
+
+local function Visualize()
+    if not Memory.Position or not Memory.Visualization then 
+        for i = 1, 20 do
+            Elements[i].Visible = false
+        end
+        return 
+    end
+    
+    local Radius = 2.5
+    local Step = math.pi * 2 / 10
+    
+    for i = 1, 10 do
+        local Angle = Step * i
+        local Start, StartOS = worldtoscreenpoint({
+            Memory.Position.x + Radius * math.cos(Angle),
+            Memory.Visualization,
+            Memory.Position.z + Radius * math.sin(Angle)
+        })
+        local End, EndOS = worldtoscreenpoint({
+            Memory.Position.x + Radius * math.cos(Angle + Step),
+            Memory.Visualization,
+            Memory.Position.z + Radius * math.sin(Angle + Step)
+        })
+        
+        if Start and End and StartOS and EndOS then
+            Elements[i].From = {Start.x, Start.y}
+            Elements[i].To = {End.x, End.y}
+            Elements[i+10].From = {Start.x, Start.y}
+            Elements[i+10].To = {End.x, End.y}
+            Elements[i].Visible = true
+            Elements[i+10].Visible = true
+        else
+            Elements[i].Visible = false
+            Elements[i+10].Visible = false
+        end
+    end
+end
+
+local function KeybindHandler()
+    while true do
+        if Cache.Root and Cache.Humanoid and gethealth(Cache.Humanoid) > 0 then
+            local Keys = getpressedkeys()
+            for _, Key in ipairs(Keys) do
+                if Key == Settings["Quick Save"] then
+                    local RootPos = getposition(Cache.Root)
+                    Memory.Position = {
+                        x = RootPos.x,
+                        y = RootPos.y,
+                        z = RootPos.z
+                    }
+                    Memory.Visualization = Floor()
+                    if os.clock() - Notified > 0.25 then
+                        SendNotification("Quick Peek: Position Saved!, ["..Settings["Quick Peek"].."] to Teleport!", "info")
+                        Notified = os.clock()
+                    end
+                elseif Key == Settings["Quick Peek"] and Memory.Position then
+                    setposition(Cache.Root, {
+                        Memory.Position.x,
+                        Memory.Position.y,
+                        Memory.Position.z
+                    })
+                end
+            end
+        end
+        wait()
+    end
+end
+
+SendNotification("Quick Peek Loaded! ["..Settings["Quick Save"].."] to Save, ["..Settings["Quick Peek"].."] to Teleport!", "info")
+
+Draw()
+spawn(Main)
+spawn(KeybindHandler)
+
+while true do
+    Visualize()
+    wait()
+end
