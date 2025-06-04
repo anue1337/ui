@@ -2,7 +2,7 @@ local Drawing = Drawing
 local isDragging = false
 local offsetX, offsetY = 0, 0
 local x, y = 100, 100
-local width, height = 200, 155 
+local width, height = 200, 165 
 
 local tValue = 0
 local ttValue = 0
@@ -31,6 +31,7 @@ local panel = {
     velocityLabel = Drawing.new("Text"),
     useridLabel = Drawing.new("Text"),
     lockStatusLabel = Drawing.new("Text"),
+    teamLabel = Drawing.new("Text"),
 
     nameValue = Drawing.new("Text"),
     displayNameValue = Drawing.new("Text"),
@@ -40,7 +41,8 @@ local panel = {
     distanceValue = Drawing.new("Text"),
     velocityValue = Drawing.new("Text"),
     useridValue = Drawing.new("Text"),
-    lockStatusValue = Drawing.new("Text")
+    lockStatusValue = Drawing.new("Text"),
+    teamValue = Drawing.new("Text")
 }
 
 function getclosestplayer()
@@ -152,6 +154,7 @@ panel.nameLabel.Text = "Name:"
 panel.displayNameLabel.Text = "Display:"
 panel.healthLabel.Text = "Health:"
 panel.toolLabel.Text = "Tool:"
+panel.teamLabel.Text = "Team:"
 panel.positionLabel.Text = "Position:"
 panel.distanceLabel.Text = "Distance:"
 panel.velocityLabel.Text = "Velocity:"
@@ -162,11 +165,12 @@ configureText(panel.nameLabel, panel.nameValue, 10, 8)
 configureText(panel.displayNameLabel, panel.displayNameValue, 25, 8)
 configureText(panel.healthLabel, panel.healthValue, 40, 8)
 configureText(panel.toolLabel, panel.toolValue, 55, 8)
-configureText(panel.positionLabel, panel.positionValue, 70, 8)
-configureText(panel.distanceLabel, panel.distanceValue, 85, 8)
-configureText(panel.velocityLabel, panel.velocityValue, 100, 8)
-configureText(panel.useridLabel, panel.useridValue, 115, 8)
-configureText(panel.lockStatusLabel, panel.lockStatusValue, 130, 8)
+configureText(panel.teamLabel, panel.teamValue, 70, 8)
+configureText(panel.positionLabel, panel.positionValue, 85, 8)
+configureText(panel.distanceLabel, panel.distanceValue, 100, 8)
+configureText(panel.velocityLabel, panel.velocityValue, 115, 8)
+configureText(panel.useridLabel, panel.useridValue, 130, 8)
+configureText(panel.lockStatusLabel, panel.lockStatusValue, 145, 8)
 
 panel.topGradientLeft.Size = {width - 8, 2}
 panel.topGradientLeft.Position = {x + 4, y + 4}
@@ -219,21 +223,23 @@ local function updatePanelPositions()
     panel.displayNameLabel.Position = {x + 8, y + 25}
     panel.healthLabel.Position = {x + 8, y + 40}
     panel.toolLabel.Position = {x + 8, y + 55}
-    panel.positionLabel.Position = {x + 8, y + 70}
-    panel.distanceLabel.Position = {x + 8, y + 85}
-    panel.velocityLabel.Position = {x + 8, y + 100}
-    panel.useridLabel.Position = {x + 8, y + 115}
-    panel.lockStatusLabel.Position = {x + 8, y + 130}
+    panel.teamLabel.Position = {x + 8, y + 70}
+    panel.positionLabel.Position = {x + 8, y + 85}
+    panel.distanceLabel.Position = {x + 8, y + 100}
+    panel.velocityLabel.Position = {x + 8, y + 115}
+    panel.useridLabel.Position = {x + 8, y + 130}
+    panel.lockStatusLabel.Position = {x + 8, y + 145}
 
     panel.nameValue.Position = {x + 63, y + 10}
     panel.displayNameValue.Position = {x + 63, y + 25}
     panel.healthValue.Position = {x + 63, y + 40}
     panel.toolValue.Position = {x + 63, y + 55}
-    panel.positionValue.Position = {x + 63, y + 70}
-    panel.distanceValue.Position = {x + 63, y + 85}
-    panel.velocityValue.Position = {x + 63, y + 100}
-    panel.useridValue.Position = {x + 63, y + 115}
-    panel.lockStatusValue.Position = {x + 63, y + 130}
+    panel.teamValue.Position = {x + 63, y + 70}
+    panel.positionValue.Position = {x + 63, y + 85}
+    panel.distanceValue.Position = {x + 63, y + 100}
+    panel.velocityValue.Position = {x + 63, y + 115}
+    panel.useridValue.Position = {x + 63, y + 130}
+    panel.lockStatusValue.Position = {x + 63, y + 145}
 end
 
 local function isKeyPressed(key)
@@ -339,6 +345,13 @@ local function updatePanel()
                         panel.positionValue.Text = string.format("%.1f, %.1f, %.1f",
                                                           head_position.x, head_position.y, head_position.z)
 
+                        local team = getteam(target)
+                        if team then
+                            panel.teamValue.Text = getname(team)
+                        else
+                            panel.teamValue.Text = "None"
+                        end
+
                         local l_plr = getlocalplayer()
                         local l_char = getcharacter(l_plr)
                         local l_head = l_char and findfirstchild(l_char, "Head")
@@ -393,6 +406,7 @@ local function updatePanel()
             panel.distanceValue.Text = "None"
             panel.velocityValue.Text = "None"
             panel.useridValue.Text = "None"
+            panel.teamValue.Text = "None"
 
             panel.lockStatusValue.Text = "UNLOCKED"
             panel.lockStatusValue.Color = {255, 255, 255}
