@@ -1,0 +1,391 @@
+local Drawing = Drawing
+local isDragging = false
+local offsetX, offsetY = 0, 0
+
+local screen = getscreendimensions()
+local x = 10 
+local y = (screen.y - 155) / 2 
+local width, height = 200, 155
+
+local tValue = 1
+local ttValue = 1
+local lerpSpeed = 0.1
+
+local lockedTarget = nil
+local isLocked = false
+local wasXPressed = false
+
+local panel = {
+    outline = Drawing.new("Square"),
+    background = Drawing.new("Square"),
+    inner1 = Drawing.new("Square"),
+    inner2 = Drawing.new("Square"),
+    inner3 = Drawing.new("Square"),
+    inner4 = Drawing.new("Square"),
+    topGradientLeft = Drawing.new("Square"),
+    topGradientRight = Drawing.new("Square"),
+
+    nameLabel = Drawing.new("Text"),
+    displayNameLabel = Drawing.new("Text"),
+    healthLabel = Drawing.new("Text"),
+    toolLabel = Drawing.new("Text"),
+    positionLabel = Drawing.new("Text"),
+    distanceLabel = Drawing.new("Text"),
+    velocityLabel = Drawing.new("Text"),
+    useridLabel = Drawing.new("Text"),
+    lockStatusLabel = Drawing.new("Text"),
+
+    nameValue = Drawing.new("Text"),
+    displayNameValue = Drawing.new("Text"),
+    healthValue = Drawing.new("Text"),
+    toolValue = Drawing.new("Text"),
+    positionValue = Drawing.new("Text"),
+    distanceValue = Drawing.new("Text"),
+    velocityValue = Drawing.new("Text"),
+    useridValue = Drawing.new("Text"),
+    lockStatusValue = Drawing.new("Text")
+}
+
+function getclosestplayer()
+    local mouse = getmouseposition()
+    local closest_fov_distance = 100
+    local closest_player = nil
+    local players = findfirstchild(Game, "Players")
+
+    local l_plr = getlocalplayer()
+
+    for _, player in ipairs(getchildren(players)) do
+        if player ~= l_plr then
+            local character = getcharacter(player)
+            if character then
+                local head = findfirstchild(character, "Head")
+                if head then
+                    local head_position = getposition(head)
+                    local wrld_to_screen, onScreen = worldtoscreenpoint({head_position.x, head_position.y, head_position.z})
+                    if onScreen then
+                        local distance = math.sqrt((wrld_to_screen.x - mouse.x)^2 + (wrld_to_screen.y - mouse.y)^2)
+                        if distance < closest_fov_distance then
+                            closest_fov_distance = distance
+                            closest_player = player
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return closest_player
+end
+
+local function lerp(current, target, t)
+    return current + (target - current) * t
+end
+
+panel.outline.Size = {width + 4, height + 4}
+panel.outline.Position = {x - 2, y - 2}
+panel.outline.Color = {20, 20, 20} 
+panel.outline.Transparency = 1
+panel.outline.Filled = true
+panel.outline.Visible = true
+panel.outline.zIndex = 1
+
+panel.background.Size = {width + 2, height + 2}
+panel.background.Position = {x - 1, y - 1}
+panel.background.Color = {25, 25, 25} 
+panel.background.Transparency = 1
+panel.background.Filled = true
+panel.background.Visible = true
+panel.background.zIndex = 2
+
+panel.inner1.Size = {width, height}
+panel.inner1.Position = {x, y}
+panel.inner1.Color = {15, 15, 15} 
+panel.inner1.Transparency = 1
+panel.inner1.Filled = true
+panel.inner1.Visible = true
+panel.inner1.zIndex = 3
+
+panel.inner2.Size = {width - 6, height - 6}
+panel.inner2.Position = {x + 3, y + 3}
+panel.inner2.Color = {30, 30, 30} 
+panel.inner2.Transparency = 1
+panel.inner2.Filled = true
+panel.inner2.Visible = true
+panel.inner2.zIndex = 4
+
+panel.inner3.Size = {width - 8, height - 8}
+panel.inner3.Position = {x + 4, y + 4}
+panel.inner3.Color = {12, 12, 12} 
+panel.inner3.Transparency = 1
+panel.inner3.Filled = true
+panel.inner3.Visible = true
+panel.inner3.zIndex = 5
+
+local function calculate3DDistance(pos1, pos2)
+    local dx = pos1.x - pos2.x
+    local dy = pos1.y - pos2.y
+    local dz = pos1.z - pos2.z
+    return math.sqrt(dx * dx + dy * dy + dz * dz)
+end
+
+local function calculateVelocityMagnitude(velocity)
+    return math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y + velocity.z * velocity.z)
+end
+
+local function configureText(labelText, valueText, yOffset, labelXOffset)
+
+    labelText.Position = {x + labelXOffset, y + yOffset}
+    labelText.Color = {0, 128, 0} 
+    labelText.Size = 14
+    labelText.Outline = true
+    labelText.OutlineColor = {0, 0, 0}
+    labelText.Visible = true
+    labelText.zIndex = 7
+
+    valueText.Position = {x + labelXOffset + 55, y + yOffset} 
+    valueText.Color = {255, 255, 255}
+    valueText.Size = 14
+    valueText.Outline = true
+    valueText.OutlineColor = {0, 0, 0}
+    valueText.Visible = true
+    valueText.zIndex = 7
+end
+
+panel.nameLabel.Text = "Name:"
+panel.displayNameLabel.Text = "Display:"
+panel.healthLabel.Text = "Health:"
+panel.toolLabel.Text = "Tool:"
+panel.positionLabel.Text = "Position:"
+panel.distanceLabel.Text = "Distance:"
+panel.velocityLabel.Text = "Velocity:"
+panel.useridLabel.Text = "UserID:"
+panel.lockStatusLabel.Text = "Lock [X]:"
+
+configureText(panel.nameLabel, panel.nameValue, 10, 8)
+configureText(panel.displayNameLabel, panel.displayNameValue, 25, 8)
+configureText(panel.healthLabel, panel.healthValue, 40, 8)
+configureText(panel.toolLabel, panel.toolValue, 55, 8)
+configureText(panel.positionLabel, panel.positionValue, 70, 8)
+configureText(panel.distanceLabel, panel.distanceValue, 85, 8)
+configureText(panel.velocityLabel, panel.velocityValue, 100, 8)
+configureText(panel.useridLabel, panel.useridValue, 115, 8)
+configureText(panel.lockStatusLabel, panel.lockStatusValue, 130, 8)
+
+panel.topGradientLeft.Size = {width - 8, 2}
+panel.topGradientLeft.Position = {x + 4, y + 4}
+panel.topGradientLeft.Color = {0, 128, 0} 
+panel.topGradientLeft.Transparency = 1
+panel.topGradientLeft.Filled = true
+panel.topGradientLeft.Visible = true
+panel.topGradientLeft.zIndex = 6
+
+panel.topGradientRight.Size = {width - 8, 2}
+panel.topGradientRight.Position = {x + 4, y + 4}
+panel.topGradientRight.Color = {0, 50, 0} 
+panel.topGradientRight.Transparency = 1
+panel.topGradientRight.Filled = true
+panel.topGradientRight.Visible = true
+panel.topGradientRight.zIndex = 5
+
+local function updatePanelPositions()
+
+    local maxWidth = math.max(
+        panel.nameValue.TextBounds.x,
+        panel.displayNameValue.TextBounds.x,
+        panel.healthValue.TextBounds.x,
+        panel.toolValue.TextBounds.x,
+        panel.positionValue.TextBounds.x,
+        panel.distanceValue.TextBounds.x,
+        panel.velocityValue.TextBounds.x,
+        panel.useridValue.TextBounds.x
+    ) + 75  
+
+    width = lerp(width, math.max(200, maxWidth), lerpSpeed)
+
+    panel.outline.Size = {width + 4, height + 4}
+    panel.background.Size = {width + 2, height + 2}
+    panel.inner1.Size = {width, height}
+    panel.inner2.Size = {width - 6, height - 6}
+    panel.inner3.Size = {width - 8, height - 8}
+    panel.topGradientLeft.Size = {width - 8, 2}
+    panel.topGradientRight.Size = {width - 8, 2}
+
+    panel.outline.Position = {x - 2, y - 2}
+    panel.background.Position = {x - 1, y - 1}
+    panel.inner1.Position = {x, y}
+    panel.inner2.Position = {x + 3, y + 3}
+    panel.inner3.Position = {x + 4, y + 4}
+    panel.topGradientLeft.Position = {x + 4, y + 4}
+    panel.topGradientRight.Position = {x + 4, y + 4}
+
+    panel.nameLabel.Position = {x + 8, y + 10}
+    panel.displayNameLabel.Position = {x + 8, y + 25}
+    panel.healthLabel.Position = {x + 8, y + 40}
+    panel.toolLabel.Position = {x + 8, y + 55}
+    panel.positionLabel.Position = {x + 8, y + 70}
+    panel.distanceLabel.Position = {x + 8, y + 85}
+    panel.velocityLabel.Position = {x + 8, y + 100}
+    panel.useridLabel.Position = {x + 8, y + 115}
+    panel.lockStatusLabel.Position = {x + 8, y + 130}
+
+    panel.nameValue.Position = {x + 63, y + 10}
+    panel.displayNameValue.Position = {x + 63, y + 25}
+    panel.healthValue.Position = {x + 63, y + 40}
+    panel.toolValue.Position = {x + 63, y + 55}
+    panel.positionValue.Position = {x + 63, y + 70}
+    panel.distanceValue.Position = {x + 63, y + 85}
+    panel.velocityValue.Position = {x + 63, y + 100}
+    panel.useridValue.Position = {x + 63, y + 115}
+    panel.lockStatusValue.Position = {x + 63, y + 130}
+end
+
+local function isKeyPressed(key)
+    local pressedKeys = getpressedkeys()
+    for _, pressedKey in ipairs(pressedKeys) do
+        if pressedKey == key then
+            return true
+        end
+    end
+    return false
+end
+
+local function handleTargetLock()
+    while wait(0.016) do 
+        local isXCurrentlyPressed = isKeyPressed("X")
+
+        if isXCurrentlyPressed and not wasXPressed then
+            if not isLocked then
+
+                local current = getclosestplayer()
+                if current then
+                    lockedTarget = current
+                    isLocked = true
+                    SendNotification("Target Locked: " .. getname(current), "success")
+                else
+                    SendNotification("No target found", "warning")
+                end
+            else
+
+                lockedTarget = nil
+                isLocked = false
+                SendNotification("Target Unlocked", "info")
+            end
+        end
+
+        wasXPressed = isXCurrentlyPressed
+    end
+end
+
+local function updatePanel()
+    while wait() do
+        local target = isLocked and lockedTarget or getclosestplayer()
+        local mouse = getmouseposition()
+
+        if isleftpressed() then
+            if mouse.x >= x and mouse.x <= x + width and
+               mouse.y >= y and mouse.y <= y + height then
+                if not isDragging then
+                    isDragging = true
+                    offsetX = mouse.x - x
+                    offsetY = mouse.y - y
+                end
+            end
+        else
+            isDragging = false
+        end
+
+        if isDragging then
+            x = mouse.x - offsetX
+            y = mouse.y - offsetY
+            updatePanelPositions()
+        end
+
+        for _, element in pairs(panel) do
+            if element.Visible ~= nil then
+                element.Visible = true
+            end
+            if element.Transparency then
+                element.Transparency = 1
+            end
+        end
+
+        if target then
+            local character = getcharacter(target)
+            if character then
+                local humanoid = findfirstchild(character, "Humanoid")
+                local head = findfirstchild(character, "Head")
+
+                local toolName = "None"
+                for _, child in ipairs(getchildren(character)) do
+                    if getclassname(child) == "Tool" then
+                        toolName = getname(child)
+                        break
+                    end
+                end
+
+                if head then
+                    local head_position = getposition(head)
+
+                    panel.nameValue.Text = getname(target)
+                    panel.displayNameValue.Text = getdisplayname(target)
+                    panel.healthValue.Text = humanoid and tostring(gethealth(humanoid)) or "None"
+                    panel.toolValue.Text = toolName
+                    panel.positionValue.Text = string.format("%.1f, %.1f, %.1f",
+                                                      head_position.x, head_position.y, head_position.z)
+
+                    local l_plr = getlocalplayer()
+                    local l_char = getcharacter(l_plr)
+                    local l_head = l_char and findfirstchild(l_char, "Head")
+                    if l_head then
+                        local l_pos = getposition(l_head)
+                        local distance = calculate3DDistance(head_position, l_pos)
+                        panel.distanceValue.Text = string.format("%.1f studs", distance)
+                    else
+                        panel.distanceValue.Text = "N/A"
+                    end
+
+                    local velocity = getvelocity(head)
+                    panel.velocityValue.Text = string.format("%.1f studs/s", calculateVelocityMagnitude(velocity))
+                    panel.useridValue.Text = tostring(getuserid(target))
+
+                    if isLocked then
+                        panel.lockStatusValue.Text = "LOCKED"
+                        panel.lockStatusValue.Color = {0, 255, 0} 
+                    else
+                        panel.lockStatusValue.Text = "UNLOCKED"
+                        panel.lockStatusValue.Color = {255, 255, 255} 
+                    end
+                end
+            else
+
+                if isLocked and target == lockedTarget then
+                    lockedTarget = nil
+                    isLocked = false
+                    SendNotification("Target Lost", "error")
+                end
+            end
+        else
+
+            panel.nameValue.Text = "None"
+            panel.displayNameValue.Text = "None"
+            panel.healthValue.Text = "None"
+            panel.toolValue.Text = "None"
+            panel.positionValue.Text = "None"
+            panel.distanceValue.Text = "None"
+            panel.velocityValue.Text = "None"
+            panel.useridValue.Text = "None"
+
+            panel.lockStatusValue.Text = "UNLOCKED"
+            panel.lockStatusValue.Color = {255, 255, 255}
+        end
+    end
+end
+
+spawn(updatePanel)
+spawn(handleTargetLock)
+
+local function cleanup()
+    for _, element in pairs(panel) do
+        element:Remove()
+    end
+end
