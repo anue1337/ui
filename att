@@ -1,0 +1,106 @@
+local attribute = {
+    utility = { pack = {}, unpack = {} },
+    offset = {
+        list = 0x130,
+        to_next = 0x70,
+        value = 0x30
+    }
+}
+
+function attribute.utility.pack:number(value)
+    if value == 0 then return value end
+
+    local str = string.pack("d", value)
+    local result = string.unpack("I8", str)
+
+    return result
+end
+
+function attribute.utility.unpack:number(value)
+    if value == 0 then return value end
+    if value > 9223372036854775807 then
+        value = value - 18446744073709551616
+    end
+
+    local str = string.pack("i8", value)
+    local result = string.unpack("d", str)
+
+    return result
+end
+
+function attribute:list(userdata)
+    local demand = getmemoryvalue(userdata, self.offset.value, "qword")
+    local data = pointer_to_user_data(demand)
+    local num = getmemoryvalue(data, self.offset.list, "qword")
+    local pointer = pointer_to_user_data(num)
+
+    local list = {}
+
+    local i = 0
+    while i < 0x400 do
+        local name = getmemoryvalue(pointer, i, "string")
+        local value = getmemoryvalue(pointer, i + self.offset.value, "string")
+
+        if not value then value = getmemoryvalue(pointer, i + self.offset.value, "qword") end
+        if not name or name == "" and not value or value == "" then break end
+
+        list[name] = if value == 1 then true elseif value == 0 then false else self.utility.unpack:number(value)
+
+        i += self.offset.to_next
+    end
+
+    return list
+end
+
+function attribute:get(userdata, attribute, type)
+    local demand = getmemoryvalue(userdata, self.offset.value, "qword")
+    local data = pointer_to_user_data(demand)
+    local num = getmemoryvalue(data, self.offset.list, "qword")
+    local pointer = pointer_to_user_data(num)
+    
+    type = type or "string"
+
+    local i = 0
+    while i < 0x400 do
+        local name = getmemoryvalue(pointer, i, "string")
+        local value = getmemoryvalue(pointer, i + self.offset.value, "string" == type and "string" or "qword")
+        
+        if not name or name == "" and not value or value == "" then break end
+
+        if name == attribute then
+            return if type == "boolean" then value == 1 or false elseif type == "number" then self.utility.unpack:number(value) else value
+        end
+
+        i += self.offset.to_next
+    end
+
+    return nil
+end
+
+function attribute:set(userdata, attribute, type, value)
+    local demand = getmemoryvalue(userdata, self.offset.value, "qword")
+    local data = pointer_to_user_data(demand)
+    local num = getmemoryvalue(data, self.offset.list, "qword")
+    local pointer = pointer_to_user_data(num)
+
+    type = type or "string"
+
+    local i = 0
+    while i < 0x400 do
+        local name = getmemoryvalue(pointer, i, "string")
+        
+        if not name or name == "" then break end
+
+        if name == attribute then
+            setmemoryvalue(pointer, i + self.offset.value, "string" == type and "string" or "qword", type == "number" and self.utility.pack:number(value) or value)
+
+            return true
+        end
+
+        i += self.offset.to_next
+    end
+
+    return false
+end
+
+return attribute
