@@ -1,0 +1,211 @@
+local clamp, ceil, sign = math.clamp, math.ceil, math.sign
+local sqrt, abs, floor = math.sqrt, math.abs, math.floor
+
+---- Classes ----
+
+local Vector = {}; do
+    Vector.__index = Vector
+
+    --> Constructor
+
+    function Vector.new(x: number, y: number, z: number?, w: number?)
+        assert(type(x) == "number" and type(y) == "number", `Vector.new: non-numeric x and/or y parameter(s) passed; {x}, {y}`)
+
+        return setmetatable(
+            {
+                x = x, y = y, z = z, w = w,
+                d = w and 4 or z and 3 or 2
+            } :: any,
+
+            Vector
+        )
+    end
+
+    --> Utility
+
+    function Vector:map(func: (number) -> number)
+        local x, y, z, w = self.x, self.y, self.z, self.w
+
+        return Vector.new(
+            func(x), func(y),
+            z and func(z),
+            w and func(w)
+        )
+    end
+
+    function Vector.pack(table: { x: number, y: number, z: number?, w: number? })
+        return Vector.new(
+            table.x or table[1],
+            table.y or table[2],
+            table.z or table[3],
+            table.w or table[4]
+        )
+    end
+
+    --> Methods
+
+    function Vector:lerp(into, time: number)
+        return self + (into - self) * time
+    end
+
+    function Vector:dot(b): number
+        return self.x * b.x + self.y * b.y +
+            (self.z and self.z * b.z or 0) +
+            (self.w and self.w * b.w or 0)
+    end
+
+    function Vector:cross(b)
+        assert(self.d == 3 and b.d == 3, `Vector.cross: both vectors must be 3 diimesional`)
+
+        return Vector.new(
+            self.y * b.z - self.z * b.y,
+            self.z * b.x - self.x * b.z,
+            self.x * b.y - self.y * b.x
+        )
+    end
+
+    function Vector:floor() return self:map(floor) end
+    function Vector:ceil() return self:map(ceil) end
+    function Vector:abs() return self:map(abs) end
+    function Vector:sign() return self:map(sign) end
+
+    function Vector:clamp(min: number, max: number)
+        return Vector.map(self, function(value: number): number
+            return clamp(value, min, max)
+        end)
+    end
+    
+    function Vector:array()
+        return { self.x, self.y, self.z, self.w }
+    end
+
+    --> Operators
+
+    function Vector:__add(b)
+        if type(b) == "number" then
+            return Vector.new(
+                self.x + b,
+                self.y + b,
+                (self.z and self.z + b),
+                (self.w and self.w + b)
+            )
+        end
+        
+        return Vector.new(
+            self.x + b.x,
+            self.y + b.y,
+            (self.z and b.z and self.z + b.z),
+            (self.w and b.w and self.w + b.w)
+        )
+    end
+
+    function Vector:__sub(b)
+        if type(b) == "number" then
+            return Vector.new(
+                self.x - b,
+                self.y - b,
+                (self.z and self.z - b),
+                (self.w and self.w - b)
+            )
+        end
+
+        return Vector.new(
+            self.x - b.x,
+            self.y - b.y,
+            (self.z and b.z and self.z - b.z),
+            (self.w and b.w and self.w - b.w)
+        )
+    end
+
+    function Vector:__mul(b)
+        if type(b) == "number" then
+            return Vector.new(
+                self.x * b,
+                self.y * b,
+                (self.z and self.z * b),
+                (self.w and self.w * b)
+            )
+        end
+
+        return Vector.new(
+            self.x * b.x,
+            self.y * b.y,
+            (self.z and b.z and self.z * b.z),
+            (self.w and b.w and self.w * b.w)
+        )
+    end
+
+    function Vector:__div(b)
+        if type(b) == "number" then
+            return Vector.new(
+                self.x / b,
+                self.y / b,
+                (self.z and self.z / b),
+                (self.w and self.w / b)
+            )
+        end
+
+        return Vector.new(
+            self.x / b.x,
+            self.y / b.y,
+            (self.z and b.z and self.z / b.z),
+            (self.w and b.w and self.w / b.w)
+        )
+    end
+
+    function Vector:__unm()
+        return Vector.new(
+            -self.x,
+            -self.y,
+            (self.z and -self.z),
+            (self.w and -self.w)
+        )
+    end
+
+    function Vector:__tostring()
+        return `Vector{self.d}({self.x}, {self.y}{(self.z and `, {self.z}` or "")}{(self.w and `, {self.w}` or "")})`
+    end
+
+    function Vector:__eq(b)
+        return
+            self.x == b.x and
+            self.y == b.y and
+            (self.z and self.z == b.z) and
+            (self.w and self.w == b.w)
+    end
+
+    function Vector:__lt(b)
+        return self:dot(self) < b:dot(b)
+    end
+
+    function Vector:__le(b)
+        return self:dot(self) <= b:dot(b)
+    end
+
+    local Index = Vector.__index
+    function Vector:__index(key: string)
+        if key == "magnitude" then
+            local sum = self.x * self.x + self.y * self.y
+
+            if self.z then sum += self.z * self.z end
+            if self.w then sum += self.w * self.w end
+
+            return sqrt(sum)
+        elseif key == "unit" then
+            local magnitude = self.magnitude
+
+            return magnitude ~= 0 and Vector.new(
+                self.x / magnitude,
+                self.y / magnitude,
+                (self.z and self.z / magnitude),
+                (self.w and self.w / magnitude)
+            ) or Vector.new(0, 0, 0, 0)
+        end
+
+        return Index[key]
+    end
+end
+
+---- Exports ----
+
+return Vector
